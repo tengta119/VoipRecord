@@ -63,9 +63,12 @@ public class FloatingControlService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        // 创建并显示悬浮窗
         createFloatingWindow();
+        // 初始化：获取系统音频管理器。
         audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
         modeChangeListener = new ModeChangeListener();
+        // 册了一个监听器，用于监视系统音频模式的变化
         audioManager.addOnModeChangedListener(getMainExecutor(), modeChangeListener);
     }
 
