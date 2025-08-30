@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:ordering="together">
+
+    <objectAnimator
+        android:targetName="line_center"
+        android:duration="800"
+        android:repeatCount="infinite"
+        android:repeatMode="restart">
+        <propertyValuesHolder android:propertyName="scaleY">
+            <keyframe android:fraction="0.0" android:value="1.0" />
+            <keyframe android:fraction="0.5" android:value="4.0" />
+            <keyframe android:fraction="1.0" android:value="1.0" />
+        </propertyValuesHolder>
+    </objectAnimator>
+
+    <objectAnimator
+        android:targetName="line_left"
+        android:duration="800"
+        android:startOffset="100"
+        android:repeatCount="infinite"
+        android:repeatMode="restart">
+        <propertyValuesHolder android:propertyName="scaleY">
+            <keyframe android:fraction="0.0" android:value="1.0" />
+            <keyframe android:fraction="0.5" android:value="3.2" />
+            <keyframe android:fraction="1.0" android:value="1.0" />
+        </propertyValuesHolder>
+    </objectAnimator>
+    <objectAnimator
+        android:targetName="line_right"
+        android:duration="800"
+        android:startOffset="100"
+        android:repeatCount="infinite"
+        android:repeatMode="restart">
+        <propertyValuesHolder android:propertyName="scaleY">
+            <keyframe android:fraction="0.0" android:value="1.0" />
+            <keyframe android:fraction="0.5" android:value="3.2" />
+            <keyframe android:fraction="1.0" android:value="1.0" />
+        </propertyValuesHolder>
+    </objectAnimator>
+
+    <objectAnimator
+        android:targetName="line_far_left"
+        android:duration="800"
+        android:startOffset="200"
+        android:repeatCount="infinite"
+        android:repeatMode="restart">
+        <propertyValuesHolder android:propertyName="scaleY">
+            <keyframe android:fraction="0.0" android:value="1.0" />
+            <keyframe android:fraction="0.5" android:value="2.2" />
+            <keyframe android:fraction="1.0" android:value="1.0" />
+        </propertyValuesHolder>
+    </objectAnimator>
+    <objectAnimator
+        android:targetName="line_far_right"
+        android:duration="800"
+        android:startOffset="200"
+        android:repeatCount="infinite"
+        android:repeatMode="restart">
+        <propertyValuesHolder android:propertyName="scaleY">
+            <keyframe android:fraction="0.0" android:value="1.0" />
+            <keyframe android:fraction="0.5" android:value="2.2" />
+            <keyframe android:fraction="1.0" android:value="1.0" />
+        </propertyValuesHolder>
+    </objectAnimator>
+
+</set>

@@ -25,6 +25,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -46,6 +47,10 @@ public class FloatingControlService extends Service {
     private AudioManager audioManager;
     private ModeChangeListener modeChangeListener;
 
+    // 在 Service 类中，你不能像在 Activity 中那样直接调用 findViewById()。Service 本身没有与之关联的UI布局，所以直接调用它会返回 null。
+    //你需要从你已经加载（inflate）并添加到 WindowManager 的 floatingView 上去查找这个 ImageView。
+    private ImageView recordingAnimationView;
+    private AnimatedVectorDrawable recordingAnimation;
 
     // --- 新增：使用包含四个状态的枚举来管理UI，逻辑更清晰 ---
     private enum RecordingState {
@@ -109,12 +114,28 @@ public class FloatingControlService extends Service {
         filter.addAction(VoipRecordService.ACTION_RECORDING_STARTED);
         filter.addAction(VoipRecordService.ACTION_RECORDING_STOPPED);
         LocalBroadcastManager.getInstance(this).registerReceiver(recordingStateReceiver, filter);
+
+        // --- 在这里一次性找到所有视图 ---
+        statusText = floatingView.findViewById(R.id.statusText);
+        recordingAnimationView = floatingView.findViewById(R.id.recording_animation_view);
+
+        // --- 获取动画Drawable并检查 ---
+        Drawable drawable = recordingAnimationView.getDrawable();
+        if (drawable instanceof AnimatedVectorDrawable) {
+            recordingAnimation = (AnimatedVectorDrawable) drawable;
+        }
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         String command = intent.getStringExtra("command");
-        statusText.setText(command);
+        if (command != null && command.equals("空闲中")) {
+            currentState = RecordingState.IDLE;
+            updateRecordButtonUI();
+        } else if (command != null && command.equals("录音中")) {
+            updateRecordButtonUI();
+            currentState = RecordingState.RECORDING;
+        }
         startForegroundService();
             return START_STICKY;
     }
@@ -239,18 +260,19 @@ public class FloatingControlService extends Service {
 
     }
 
-
-
-
     private void updateRecordButtonUI() {
         if (statusText == null) return;
 
         switch (currentState) {
             case IDLE:
                 statusText.setText("空闲中");
+                recordingAnimation.stop(); // <--- 停止动画
+                recordingAnimationView.setVisibility(View.GONE); // <--- 隐藏动画视图
                 break;
             case RECORDING:
                 statusText.setText("录音中");
+                recordingAnimationView.setVisibility(View.VISIBLE); // <--- 显示动画视图
+                recordingAnimation.start(); // <--- 开始动画
                 break;
         }
     }

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/ic_recording_lines">
+
+    <target
+        android:name="line_center"
+        android:animation="@animator/anim_recording_flow" />
+
+    <target
+        android:name="line_left"
+        android:animation="@animator/anim_recording_flow" />
+
+    <target
+        android:name="line_right"
+        android:animation="@animator/anim_recording_flow" />
+
+    <target
+        android:name="line_far_left"
+        android:animation="@animator/anim_recording_flow" />
+
+    <target
+        android:name="line_far_right"
+        android:animation="@animator/anim_recording_flow" />
+
+</animated-vector>

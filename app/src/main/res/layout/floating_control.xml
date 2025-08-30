@@ -5,26 +5,30 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:gravity="center_horizontal"
-    android:minWidth="90dp"
+    android:minWidth="100dp"
     android:background="@drawable/bg_floating_window_rounded"
-    android:paddingBottom="12dp"
-    android:elevation="8dp">
+    android:paddingBottom="20dp"
+    android:elevation="10dp">
 
     <LinearLayout
         android:id="@+id/dragHandle"
         android:layout_width="match_parent"
         android:layout_height="24dp"
         android:gravity="center"
-        android:paddingTop="8dp"
-        android:paddingBottom="8dp">
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
 
         <View
             android:layout_width="32dp"
-            android:layout_height="4dp"
+            android:layout_height="15dp"
             android:background="@drawable/ic_drag_handle" />
     </LinearLayout>
 
-
+    <ImageView
+        android:id="@+id/recording_animation_view"
+        android:layout_width="40dp"
+        android:layout_height="36dp"
+        android:src="@drawable/avd_recording_flow"/>
 
     <TextView
         android:id="@+id/statusText"
