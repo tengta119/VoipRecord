@@ -104,7 +104,7 @@ public class FloatingControlService extends Service {
         // 册了一个监听器，用于监视系统音频模式的变化
         audioManager.addOnModeChangedListener(getMainExecutor(), modeChangeListener);
 
-        // --- 新增：注册广播接收器 ---
+        // ---注册广播接收器，监听 VoipRecordService 的广播 ---
         IntentFilter filter = new IntentFilter();
         filter.addAction(VoipRecordService.ACTION_RECORDING_STARTED);
         filter.addAction(VoipRecordService.ACTION_RECORDING_STOPPED);
@@ -113,7 +113,9 @@ public class FloatingControlService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-            startForegroundService();
+        String command = intent.getStringExtra("command");
+        statusText.setText(command);
+        startForegroundService();
             return START_STICKY;
     }
 

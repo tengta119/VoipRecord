@@ -136,6 +136,11 @@ public class MainActivity extends AppCompatActivity {
 
             // 启动悬浮窗服务
             Intent serviceIntent = new Intent(this, FloatingControlService.class);
+            if (currentState == RecordingState.IDLE) {
+                serviceIntent.putExtra("command", "空闲中");
+            } else {
+                serviceIntent.putExtra("command", "录音中");
+            }
             // 以一种现代、安全且向后兼容的方式，启动一个高优先级的后台服务（即“前台服务”）。
             ContextCompat.startForegroundService(this, serviceIntent);
             Toast.makeText(this, "悬浮窗已启动", Toast.LENGTH_SHORT).show();
