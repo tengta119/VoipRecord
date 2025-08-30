@@ -1,22 +1,35 @@
 package com.example.voiprecord;
 
+import static androidx.constraintlayout.helper.widget.MotionEffect.TAG;
+
 import android.Manifest;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.drawable.AnimatedVectorDrawable;
+import android.graphics.drawable.Drawable;
+import android.media.AudioManager;
 import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -25,6 +38,55 @@ public class MainActivity extends AppCompatActivity {
 
     private EditText etUsername, etServer;
     private Button btnRequestPermission, btnStartFloating, btnStopFloating;
+
+    private ImageButton recordButton;
+    private TextView statusText;
+
+    private enum RecordingState {
+        IDLE,       // 空闲
+        STARTING,   // 正在启动
+        RECORDING,  // 录音中
+        STOPPING    // 正在停止
+    }
+    private RecordingState currentState = RecordingState.IDLE;
+
+    private class ModeChangeListener implements AudioManager.OnModeChangedListener {
+        @Override
+        public void onModeChanged(int mode) {
+            Log.d(TAG, "Audio mode changed to: " + mode);
+            // 检测VoIP通话状态
+            if (mode == AudioManager.MODE_IN_COMMUNICATION) {
+                currentState = RecordingState.STARTING;
+                updateRecordButtonUI();
+            } else if (mode == AudioManager.MODE_NORMAL) {
+                currentState = RecordingState.STOPPING;
+                updateRecordButtonUI();
+            }
+        }
+    }
+
+    private AudioManager audioManager;
+    private ModeChangeListener modeChangeListener;
+    private final BroadcastReceiver recordingStateReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String action = intent.getAction();
+            if (action == null) {
+                return;
+            }
+            switch (action) {
+                case VoipRecordService.ACTION_RECORDING_STARTED:
+                    currentState = RecordingState.RECORDING;
+                    updateRecordButtonUI();
+                    break;
+                case VoipRecordService.ACTION_RECORDING_STOPPED:
+                    currentState = RecordingState.IDLE;
+                    updateRecordButtonUI();
+                    break;
+                default:
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -85,6 +147,113 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(getApplicationContext(), "悬浮窗已停止", Toast.LENGTH_SHORT).show();
         });
 
+        recordButton = findViewById(R.id.recordButtonMain);
+        statusText = findViewById(R.id.statusTextMain);
+        // 初始化 UI 状态
+        updateRecordButtonUI();
+
+        recordButton.setOnClickListener(v -> toggleRecording());
+
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(VoipRecordService.ACTION_RECORDING_STARTED);
+        filter.addAction(VoipRecordService.ACTION_RECORDING_STOPPED);
+        LocalBroadcastManager.getInstance(this).registerReceiver(recordingStateReceiver, filter);
+
+        // 初始化：获取系统音频管理器。
+        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        modeChangeListener = new ModeChangeListener();
+        // 册了一个监听器，用于监视系统音频模式的变化
+        audioManager.addOnModeChangedListener(getMainExecutor(), modeChangeListener);
+    }
+
+    private void toggleRecording() {
+        if (VoipRecordService.getMediaProjection() == null) {
+            Toast.makeText(this, "请先重新授权", Toast.LENGTH_SHORT).show();
+            statusText.setText("后台清理后请重新授权");
+            return;
+        }
+
+        switch (currentState) {
+            case IDLE:
+                // 从“空闲”切换到“正在启动”
+                currentState = RecordingState.STARTING;
+                // 立即更新UI以显示中间状态
+                updateRecordButtonUI();
+                startRecording();
+                break;
+            case RECORDING:
+                // 从“录音中”切换到“正在停止”
+                currentState = RecordingState.STOPPING;
+                // 立即更新UI以显示中间状态
+                updateRecordButtonUI();
+                stopRecording();
+                break;
+            case STARTING:
+            case STOPPING:
+                // 在中间状态时，不执行任何操作，防止用户重复点击
+                Toast.makeText(this, "正在处理，请稍候...", Toast.LENGTH_SHORT).show();
+                break;
+        }
+    }
+
+    private void startRecording() {
+        // 启动录音服务
+        Intent serviceIntent = new Intent(this, VoipRecordService.class);
+        serviceIntent.putExtra("command", "start");
+        // Android O+ 建议使用 startForegroundService，如果 VoipRecordService 会在 onStartCommand 里调用 startForeground
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
+        }
+    }
+
+    private void stopRecording() {
+        // 停止录音服务
+        Intent serviceIntent = new Intent(this, VoipRecordService.class);
+        serviceIntent.putExtra("command", "stop");
+        startService(serviceIntent);
+    }
+
+    private void updateRecordButtonUI() {
+        if (recordButton == null || statusText == null) return;
+
+        Drawable previousDrawable = recordButton.getDrawable();
+        if (previousDrawable instanceof AnimatedVectorDrawable) {
+            ((AnimatedVectorDrawable) previousDrawable).stop();
+        }
+
+        switch (currentState) {
+            case IDLE:
+                recordButton.setEnabled(true);
+                recordButton.setBackgroundResource(R.drawable.bg_record_idle);
+                recordButton.setImageResource(R.drawable.ic_mic);
+                statusText.setText("开始录音");
+                break;
+            case RECORDING:
+                recordButton.setEnabled(true);
+                recordButton.setBackgroundResource(R.drawable.bg_record_active);
+                recordButton.setImageResource(R.drawable.ic_stop_white);
+                statusText.setText("录音中");
+                break;
+            case STARTING:
+            case STOPPING:
+                recordButton.setEnabled(false); // 禁用按钮防止重复点击
+                recordButton.setBackgroundResource(R.drawable.bg_record_idle); // 中间状态使用空闲背景
+                recordButton.setImageResource(R.drawable.avd_loading_animated);
+
+                //// 启动动画
+                Drawable drawable = recordButton.getDrawable();
+                if (drawable instanceof AnimatedVectorDrawable) {
+                    AnimatedVectorDrawable avd = (AnimatedVectorDrawable) drawable;
+                    avd.stop();
+                    avd.start();
+                }
+
+                // 根据状态设置文本
+                statusText.setText(currentState == RecordingState.STARTING ? "启动中..." : "处理中...");
+                break;
+        }
     }
 
     private void checkAndRequestPermissions() {

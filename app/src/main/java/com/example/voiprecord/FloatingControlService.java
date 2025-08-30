@@ -34,9 +34,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 public class FloatingControlService extends Service {
     private WindowManager windowManager;
     private View floatingView;
-    private ImageButton recordButton;
     private TextView statusText;
-    private boolean isRecording = false;
     private int initialX;
     private int initialY;
     private float initialTouchX;
@@ -65,7 +63,6 @@ public class FloatingControlService extends Service {
             if (action == null) {
                 return;
             }
-
             switch (action) {
                 case VoipRecordService.ACTION_RECORDING_STARTED:
                     currentState = RecordingState.RECORDING;
@@ -88,11 +85,9 @@ public class FloatingControlService extends Service {
             if (mode == AudioManager.MODE_IN_COMMUNICATION) {
                 currentState = RecordingState.STARTING;
                 updateRecordButtonUI();
-                startRecording();
             } else if (mode == AudioManager.MODE_NORMAL) {
                 currentState = RecordingState.STOPPING;
                 updateRecordButtonUI();
-                stopRecording();
             }
         }
     }
@@ -238,106 +233,26 @@ public class FloatingControlService extends Service {
         // 添加悬浮窗
         windowManager.addView(floatingView, params);
 
-        // 初始化按钮（ImageButton）和状态文本
-        recordButton = floatingView.findViewById(R.id.recordButton);
         statusText = floatingView.findViewById(R.id.statusText);
 
-        // 初始化 UI 状态
-        updateRecordButtonUI();
-
-        recordButton.setOnClickListener(v -> toggleRecording());
     }
 
 
-    private void toggleRecording() {
-        if (VoipRecordService.getMediaProjection() == null) {
-            Toast.makeText(this, "请先重新授权", Toast.LENGTH_SHORT).show();
-            statusText.setText("后台清理后请重新授权");
-            return;
-        }
 
-        switch (currentState) {
-            case IDLE:
-                // 从“空闲”切换到“正在启动”
-                currentState = RecordingState.STARTING;
-                // 立即更新UI以显示中间状态
-                updateRecordButtonUI();
-                startRecording();
-                break;
-            case RECORDING:
-                // 从“录音中”切换到“正在停止”
-                currentState = RecordingState.STOPPING;
-                // 立即更新UI以显示中间状态
-                updateRecordButtonUI();
-                stopRecording();
-                break;
-            case STARTING:
-            case STOPPING:
-                // 在中间状态时，不执行任何操作，防止用户重复点击
-                Toast.makeText(this, "正在处理，请稍候...", Toast.LENGTH_SHORT).show();
-                break;
-        }
-    }
 
     private void updateRecordButtonUI() {
-        if (recordButton == null || statusText == null) return;
-
-        Drawable previousDrawable = recordButton.getDrawable();
-        if (previousDrawable instanceof AnimatedVectorDrawable) {
-            ((AnimatedVectorDrawable) previousDrawable).stop();
-        }
+        if (statusText == null) return;
 
         switch (currentState) {
             case IDLE:
-                recordButton.setEnabled(true);
-                recordButton.setBackgroundResource(R.drawable.bg_record_idle);
-                recordButton.setImageResource(R.drawable.ic_mic);
-                statusText.setText("开始录音");
+                statusText.setText("空闲中");
                 break;
             case RECORDING:
-                recordButton.setEnabled(true);
-                recordButton.setBackgroundResource(R.drawable.bg_record_active);
-                recordButton.setImageResource(R.drawable.ic_stop_white);
                 statusText.setText("录音中");
                 break;
-            case STARTING:
-            case STOPPING:
-                recordButton.setEnabled(false); // 禁用按钮防止重复点击
-                recordButton.setBackgroundResource(R.drawable.bg_record_idle); // 中间状态使用空闲背景
-                recordButton.setImageResource(R.drawable.avd_loading_animated);
-
-                //// 启动动画
-                Drawable drawable = recordButton.getDrawable();
-                if (drawable instanceof AnimatedVectorDrawable) {
-                    AnimatedVectorDrawable avd = (AnimatedVectorDrawable) drawable;
-                    avd.stop();
-                    avd.start();
-                }
-
-                // 根据状态设置文本
-                statusText.setText(currentState == RecordingState.STARTING ? "启动中..." : "处理中...");
-                break;
         }
     }
 
-    private void startRecording() {
-        // 启动录音服务
-        Intent serviceIntent = new Intent(this, VoipRecordService.class);
-        serviceIntent.putExtra("command", "start");
-        // Android O+ 建议使用 startForegroundService，如果 VoipRecordService 会在 onStartCommand 里调用 startForeground
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent);
-        } else {
-            startService(serviceIntent);
-        }
-    }
-
-    private void stopRecording() {
-        // 停止录音服务
-        Intent serviceIntent = new Intent(this, VoipRecordService.class);
-        serviceIntent.putExtra("command", "stop");
-        startService(serviceIntent);
-    }
 
     @Override
     public void onDestroy() {

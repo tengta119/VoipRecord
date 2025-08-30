@@ -5,47 +5,90 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp"
+    android:padding="24dp"
+    android:background="#FFFFFF"
     tools:context=".MainActivity">
 
-    <!-- 权限按钮 -->
-    <Button
-        android:id="@+id/btnRequestPermission"
-        android:layout_width="match_parent"
+    <TextView
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="申请录音权限" />
+        android:text="配置"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="?android:textColorPrimary"
+        android:layout_marginBottom="8dp"/>
 
-    <!-- 用户名输入 -->
     <EditText
         android:id="@+id/etUsername"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="请输入用户名"
         android:inputType="textPersonName"
-        android:layout_marginTop="12dp" />
+        android:background="@drawable/bg_edittext_rounded"
+        android:padding="12dp"
+        android:layout_marginBottom="12dp" /> <EditText
+    android:id="@+id/etServer"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:hint="服务器地址 (例如 192.168.1.100)"
+    android:inputType="textUri"
+    android:background="@drawable/bg_edittext_rounded"
+    android:padding="12dp"
+    android:layout_marginBottom="24dp"/> <Button
+    android:id="@+id/btnRequestPermission"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_button_rounded"
+    android:text="1. 申请录音权限"
+    android:textColor="@android:color/white"
+    android:layout_marginBottom="12dp"/>
 
-    <!-- 服务器地址输入 -->
-    <EditText
-        android:id="@+id/etServer"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="服务器地址:端口 (例如 192.168.1.100:5000)"
-        android:inputType="textUri"
-        android:layout_marginTop="8dp" />
-
-    <!-- 启动悬浮窗按钮 -->
     <Button
         android:id="@+id/btnStartFloating"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="启动悬浮窗控制"
-        android:layout_marginTop="16dp" />
+        android:background="@drawable/bg_button_rounded"
+        android:text="2. 启动悬浮窗控制"
+        android:textColor="@android:color/white" />
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center">
+
+        <ImageButton
+            android:id="@+id/recordButtonMain"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:background="@drawable/bg_record_idle"
+            android:src="@drawable/ic_mic"
+            android:scaleType="centerInside"
+            android:padding="16dp"
+            android:contentDescription="录音按钮"
+            android:elevation="4dp" />
+        <TextView
+        android:id="@+id/statusTextMain"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="开始录音"
+        android:textColor="?android:textColorSecondary" android:textSize="14sp"
+        android:layout_marginTop="12dp" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
 
     <Button
         android:id="@+id/btnStopFloating"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="停止悬浮窗控制" />
-
-</LinearLayout>
+        android:text="停止悬浮窗控制"
+        android:backgroundTint="#E91E63" /> </LinearLayout>

@@ -4,54 +4,36 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:background="@drawable/bg_floating_control"
-    android:padding="8dp"
-    android:elevation="6dp">
+    android:gravity="center_horizontal"
+    android:minWidth="90dp"
+    android:background="@drawable/bg_floating_window_rounded"
+    android:paddingBottom="12dp"
+    android:elevation="8dp">
 
-    <!-- 拖拽手柄：仅在此区域响应拖拽 -->
     <LinearLayout
         android:id="@+id/dragHandle"
         android:layout_width="match_parent"
-        android:layout_height="30dp"
-        android:orientation="horizontal"
-        android:background="@drawable/drag_handle_selector"
-        android:gravity="center">
+        android:layout_height="24dp"
+        android:gravity="center"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
 
         <View
-            android:layout_width="40dp"
+            android:layout_width="32dp"
             android:layout_height="4dp"
-            android:background="#CCCCCC"
-            android:layout_marginTop="4dp" />
+            android:background="@drawable/ic_drag_handle" />
     </LinearLayout>
 
-    <!-- 中心区域：图标按钮 + 状态 -->
-    <LinearLayout
+
+
+    <TextView
+        android:id="@+id/statusText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:layout_marginTop="6dp"
-        android:layout_marginBottom="6dp">
-
-        <ImageButton
-            android:id="@+id/recordButton"
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:background="@drawable/bg_record_idle"
-            android:src="@drawable/ic_mic"
-            android:scaleType="centerInside"
-            android:padding="12dp"
-            android:contentDescription="录音按钮"
-            android:adjustViewBounds="true" />
-
-        <TextView
-            android:id="@+id/statusText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="开始录音"
-            android:textColor="#000000"
-            android:textSize="12sp"
-            android:layout_marginTop="6dp" />
-    </LinearLayout>
+        android:text="空闲中"
+        android:textColor="?android:textColorPrimary"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:layout_marginTop="8dp" />
 
 </LinearLayout>
