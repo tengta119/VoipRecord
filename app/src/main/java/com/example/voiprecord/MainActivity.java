@@ -17,6 +17,7 @@ import android.media.projection.MediaProjectionManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.Settings;
 import android.util.Log;
 import android.widget.Button;
@@ -31,16 +32,27 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+import java.io.File;
+import java.io.FileFilter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+
 public class MainActivity extends AppCompatActivity {
 
     private static final int OVERLAY_PERMISSION_CODE = 1001;
     private static final int REQUEST_PERMISSIONS_CODE = 1002;
+
+    private static final long MAX_FOLDER_SIZE_BYTES = 5L * 1024 * 1024 * 1024;
 
     private EditText etUsername, etServer;
     private Button btnRequestPermission, btnStartFloating, btnStopFloating;
 
     private ImageButton recordButton;
     private TextView statusText;
+
+    private Thread deleteRecordFile;
 
     private enum RecordingState {
         IDLE,       // 空闲
@@ -169,6 +181,62 @@ public class MainActivity extends AppCompatActivity {
         modeChangeListener = new ModeChangeListener();
         // 册了一个监听器，用于监视系统音频模式的变化
         audioManager.addOnModeChangedListener(getMainExecutor(), modeChangeListener);
+
+        //删除缓存文件
+        deleteFile();
+    }
+
+    private void deleteFile() {
+        deleteRecordFile = new Thread(() -> {
+            while (true) {
+
+                try {
+                    // 这里的逻辑和方案一中的 checkAndCleanVoipFolder 方法完全一样
+                    File directory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+                    if (!directory.exists()) {
+                        return;
+                    }
+
+                    FileFilter pcmFileFilter = file -> file.isFile() && file.getName().startsWith("voip_") && file.getName().endsWith(".pcm");
+                    File[] files = directory.listFiles(pcmFileFilter);
+
+                    if (files == null || files.length == 0) {
+                        return;
+                    }
+
+                    List<File> pcmFiles = new ArrayList<>();
+                    long currentTotalSize = 0;
+                    for (File file : files) {
+                        currentTotalSize += file.length();
+                        pcmFiles.add(file);
+                    }
+
+                    if (currentTotalSize >= MAX_FOLDER_SIZE_BYTES) {
+                        pcmFiles.sort(Comparator.comparing(File::getName));
+                        while (currentTotalSize >= MAX_FOLDER_SIZE_BYTES && !pcmFiles.isEmpty()) {
+                            File oldestFile = pcmFiles.get(0);
+                            long oldestFileSize = oldestFile.length();
+                            if (oldestFile.delete()) {
+                                currentTotalSize -= oldestFileSize;
+                                pcmFiles.remove(0);
+                            } else {
+                                Log.e(TAG, "Failed to delete file: " + oldestFile.getAbsolutePath());
+                            }
+                        }
+                    }
+                    Log.d(TAG, "清理任务执行完毕。");
+                } catch (Exception e) {
+                    Log.e(TAG, "清理任务发生错误", e);
+                }
+
+                try {
+                    Thread.sleep(10000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        deleteRecordFile.start();
     }
 
     private void toggleRecording() {
