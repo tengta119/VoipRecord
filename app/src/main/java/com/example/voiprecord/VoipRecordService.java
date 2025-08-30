@@ -155,13 +155,15 @@ public class VoipRecordService extends Service {
             }
         }, null);
 
-        imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2);
-        virtualDisplay = mMediaProjection.createVirtualDisplay(
-                "ScreenCapture",
-                width, height, density,
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                imageReader.getSurface(),
-                null, null);
+        if (imageReader == null && virtualDisplay == null) {
+            imageReader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2);
+            virtualDisplay = mMediaProjection.createVirtualDisplay(
+                    "ScreenCapture",
+                    width, height, density,
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                    imageReader.getSurface(),
+                    null, null);
+        }
     }
 
     private void startRecording() {
@@ -177,7 +179,6 @@ public class VoipRecordService extends Service {
         String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
         micOutputFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "voip_up_" + timestamp + ".pcm");
         playbackOutputFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "voip_down_" + timestamp + ".pcm");
-
         int minBufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT);
         int bufferSize = minBufferSize * BUFFER_SIZE_FACTOR;
 
@@ -394,6 +395,16 @@ public class VoipRecordService extends Service {
     public void onDestroy() {
         super.onDestroy();
         stopRecording();
+
+        if (virtualDisplay != null) {
+            virtualDisplay.release();
+            virtualDisplay = null;
+        }
+
+        if(mMediaProjection != null){
+            mMediaProjection.stop();
+            mMediaProjection = null;
+        }
     }
 
     private void stopRecording() {
@@ -427,17 +438,9 @@ public class VoipRecordService extends Service {
             playbackRecord.release();
             playbackRecord = null;
         }
-        if (virtualDisplay != null) {
-            virtualDisplay.release();
-            virtualDisplay = null;
-        }
         if (imageReader != null) {
             imageReader.close();
             imageReader = null;
-        }
-        if(mMediaProjection != null){
-            mMediaProjection.stop();
-            mMediaProjection = null;
         }
 
 
