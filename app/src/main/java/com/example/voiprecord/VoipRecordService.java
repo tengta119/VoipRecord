@@ -27,6 +27,7 @@ import android.widget.Toast;
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -71,6 +72,9 @@ public class VoipRecordService extends Service {
     private ImageReader imageReader;
     private VirtualDisplay virtualDisplay;
 
+    // 1. 定义两个公开的 Action 字符串
+    public static final String ACTION_RECORDING_STARTED = "com.example.voiprecord.RECORDING_STARTED";
+    public static final String ACTION_RECORDING_STOPPED = "com.example.voiprecord.RECORDING_STOPPED";
 
     private void startForegroundService() {
         // 创建通知渠道 (Android 8.0+)
@@ -363,6 +367,10 @@ public class VoipRecordService extends Service {
             Log.e(TAG, "Recording start failed", e);
             stopSelf();
         }
+
+
+        Intent intent = new Intent(ACTION_RECORDING_STARTED);
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
     }
     /**
      * 发送用户名到服务器
@@ -458,5 +466,9 @@ public class VoipRecordService extends Service {
             Log.e(TAG, "Thread stop interrupted", e);
             Thread.currentThread().interrupt();
         }
+
+        Intent intent = new Intent(ACTION_RECORDING_STOPPED);
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
+
     }
 }
