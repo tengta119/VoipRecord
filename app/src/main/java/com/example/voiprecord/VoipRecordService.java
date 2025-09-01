@@ -34,23 +34,23 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+import com.example.voiprecord.VO.UserSession;
+import com.example.voiprecord.utils.VoipUtil;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
-import java.util.UUID;
+import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class VoipRecordService extends Service {
     private static final String TAG = "VoipRecordingService";
-    private static final int SAMPLE_RATE = 16000;
+    public static final int SAMPLE_RATE = 16000;
     private static final int CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO;
     private static final int AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT;
     private static final int BUFFER_SIZE_FACTOR = 4;
@@ -81,6 +81,12 @@ public class VoipRecordService extends Service {
     public static final String ACTION_RECORDING_STARTED = "com.example.voiprecord.RECORDING_STARTED";
     public static final String ACTION_RECORDING_STOPPED = "com.example.voiprecord.RECORDING_STOPPED";
 
+    // 音频块的录制时长
+    public static int AUDIO_CHUNK_INTERVAL_MS = 15000 / 4;
+    // 截屏的时间
+    public static int IMAGE_FREQUENCY = 15000 / 4;
+    // Session
+    public static String USERSESSIONID;
     private void startForegroundService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
@@ -178,12 +184,6 @@ public class VoipRecordService extends Service {
             initScreenshot();
         }
 
-        // 会话的唯一表示
-        String sessionId = UUID.randomUUID().toString() + "_" + username;
-
-        String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
-        micOutputFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "voip_up_" + timestamp + ".pcm");
-        playbackOutputFile = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "voip_down_" + timestamp + ".pcm");
         int minBufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT);
         int bufferSize = minBufferSize * BUFFER_SIZE_FACTOR;
 
@@ -221,10 +221,18 @@ public class VoipRecordService extends Service {
             isRecording = true;
 
             // 线程自己管理连接
-            micThread = new Thread(() -> recordAndSendAudio(micRecord, micOutputFile, "uplink", 8001, sessionId));
-            playbackThread = new Thread(() -> recordAndSendAudio(playbackRecord, playbackOutputFile, "downlink", 8002, sessionId));
+            micThread = new Thread(() -> recordAndSendAudio(micRecord, "ch0"));
+            playbackThread = new Thread(() -> recordAndSendAudio(playbackRecord, "ch1"));
             screenshotThread = new Thread(this::captureAndSendScreenshots);
+            CompletableFuture<UserSession> completableFuture = CompletableFuture.supplyAsync(() -> {
+                UserSession userSession = ApiClient.createNewCallSession(MainActivity.IP, username);
+                AUDIO_CHUNK_INTERVAL_MS = userSession.getAudioChunkSize() * 1000;
+                IMAGE_FREQUENCY = userSession.getImageFrequency() * 1000;
+                USERSESSIONID = userSession.getSessionId();
 
+                return userSession;
+            });
+            completableFuture.get();
             micThread.start();
             playbackThread.start();
             if (!serverAddress.isEmpty()) {
@@ -275,10 +283,8 @@ public class VoipRecordService extends Service {
      * 新增：发送用户名的辅助方法
      */
     private void sendUsername(OutputStream out, String username) throws IOException {
-        byte[] usernameBytes = username.getBytes("UTF-8");
-        ByteBuffer buffer = ByteBuffer.allocate(4);
-        buffer.putInt(usernameBytes.length);
-        out.write(buffer.array());
+        byte[] usernameBytes = username.getBytes(StandardCharsets.UTF_8);
+        out.write(usernameBytes.length);
         out.write(usernameBytes);
         out.flush();
         Log.d(TAG, "Sent username: " + username);
@@ -287,50 +293,52 @@ public class VoipRecordService extends Service {
     /**
      * 重构：录制并发送音频的线程任务
      */
-    private void recordAndSendAudio(AudioRecord audioRecord, File outputFile, String direction, int port, String sessionId) {
-        final int bufferSize = 4096;
-        byte[] buffer = new byte[bufferSize];
-        Socket socket = null;
-        OutputStream netStream = null;
+    private void recordAndSendAudio(AudioRecord audioRecord, String direction) {
+        final int readBufferSize = 4096;
+        byte[] readBuffer = new byte[readBufferSize];
 
-        try (FileOutputStream fos = new FileOutputStream(outputFile)) {
-            while (isRecording) {
-                // 检查网络连接，如果断开则重连
-                if (!serverAddress.isEmpty() && (socket == null || !socket.isConnected() || socket.isClosed())) {
-                    AtomicReference<OutputStream> streamRef = new AtomicReference<>();
-                    socket = connectWithRetry(serverAddress, port, streamRef);
-                    netStream = streamRef.get();
-                    if (socket == null) { // 如果在重连时录音被停止
-                        break;
-                    }
+        int count = 0;
+        while (isRecording) {
+
+            // Step 1: 累计 AUDIO_CHUNK_INTERVAL_MS 的音频数据
+            ByteArrayOutputStream pcmChunk = new ByteArrayOutputStream();
+            long startTime = System.currentTimeMillis();
+            while (isRecording && (System.currentTimeMillis() - startTime < AUDIO_CHUNK_INTERVAL_MS)) {
+                int read = audioRecord.read(readBuffer, 0, readBufferSize);
+                if (read > 0) {
+                    pcmChunk.write(readBuffer, 0, read);
                 }
 
-                int read = audioRecord.read(buffer, 0, bufferSize);
-                if (read <= 0) continue;
-
-                fos.write(buffer, 0, read);
-
-                if (netStream != null) {
-                    try {
-                        int size = sessionId.length();
-                        netStream.write(size);
-                        netStream.write(sessionId.getBytes());
-                        netStream.write(buffer, 0, read);
-                        netStream.flush();
-                    } catch (IOException e) {
-                        Log.e(TAG, "Network send error on " + direction + ". Connection lost. Attempting to reconnect.", e);
-                        // 发送失败后，关闭旧连接并置空，以便下次循环时触发重连
-                        closeSocket(socket);
-                        socket = null;
-                        netStream = null;
-                    }
-                }
             }
-        } catch (IOException e) {
-            Log.e(TAG, "File write error: " + outputFile.getName(), e);
-        } finally {
-            closeSocket(socket);
+
+            if (!isRecording || pcmChunk.size() == 0) {
+                continue;
+            }
+
+            // Step 2: 将音频数据转换为 wav 格式
+            byte[] pcmData = pcmChunk.toByteArray();
+            byte[] wavData;
+            try {
+                byte[] header = VoipUtil.createWavHeader(pcmData.length);
+                wavData = new byte[header.length + pcmData.length];
+                System.arraycopy(header, 0, wavData, 0, header.length);
+                System.arraycopy(pcmData, 0, wavData, header.length, pcmData.length);
+            } catch (IOException e) {
+                Log.e(TAG, "Failed to create WAV header for " + direction, e);
+                continue;
+            }
+
+            File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), count + "_voip_up_" + direction + "_" + username + ".wav");
+            try(FileOutputStream fosChunk = new FileOutputStream(file)) {
+                fosChunk.write(wavData);
+            } catch (IOException e) {
+                Log.e(TAG, "File write error: " + file.getName(), e);
+            }
+            ApiClient.uploadAudioChunk(MainActivity.IP, USERSESSIONID, direction, count, file);
+            count++;
+            Log.i(TAG, "Sent " + direction + " chunk: " + file.getName());
         }
+
         Log.i(TAG, direction + " thread finished.");
     }
 
@@ -455,6 +463,7 @@ public class VoipRecordService extends Service {
         Log.i(TAG, "Recording stopped successfully.");
         LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(ACTION_RECORDING_STOPPED));
     }
+
 
     /**
      * 新增：安全关闭 Socket 的辅助方法

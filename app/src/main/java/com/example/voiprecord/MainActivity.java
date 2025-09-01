@@ -34,10 +34,15 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import java.io.File;
 import java.io.FileFilter;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -61,7 +66,7 @@ public class MainActivity extends AppCompatActivity {
         STOPPING    // 正在停止
     }
     private RecordingState currentState = RecordingState.IDLE;
-
+    public static String IP = "http://192.168.15.55:8080";
     private class ModeChangeListener implements AudioManager.OnModeChangedListener {
         @Override
         public void onModeChanged(int mode) {
