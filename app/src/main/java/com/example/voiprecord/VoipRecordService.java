@@ -36,7 +36,8 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.example.voiprecord.utils.ApiClient;
 import com.example.voiprecord.utils.VoipUtil;
-import com.example.voiprecord.vo.UserSession;
+import com.example.voiprecord.vo.CloseSessionVO;
+import com.example.voiprecord.vo.UserSessionVO;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -213,13 +214,13 @@ public class VoipRecordService extends Service {
             micThread = new Thread(() -> recordAndSendAudio(micRecord, "ch0"));
             playbackThread = new Thread(() -> recordAndSendAudio(playbackRecord, "ch1"));
             screenshotThread = new Thread(this::captureAndSendScreenshots);
-            CompletableFuture<UserSession> completableFuture = CompletableFuture.supplyAsync(() -> {
-                UserSession userSession = ApiClient.createNewCallSession(MainActivity.IP, username);
-                AUDIO_CHUNK_INTERVAL_MS = userSession.getAudioChunkSize() * 1000;
-                IMAGE_FREQUENCY = userSession.getImageFrequency() * 1000;
-                USERSESSIONID = userSession.getSessionId();
+            CompletableFuture<UserSessionVO> completableFuture = CompletableFuture.supplyAsync(() -> {
+                UserSessionVO userSessionVO = ApiClient.createNewCallSession(MainActivity.IP, username);
+                AUDIO_CHUNK_INTERVAL_MS = userSessionVO.getAudioChunkSize() * 1000;
+                IMAGE_FREQUENCY = userSessionVO.getImageFrequency() * 1000;
+                USERSESSIONID = userSessionVO.getSessionId();
 
-                return userSession;
+                return userSessionVO;
             });
             completableFuture.get();
             micThread.start();
@@ -351,6 +352,10 @@ public class VoipRecordService extends Service {
             playbackRecord = null;
         }
 
+        new Thread(() -> {
+            CloseSessionVO closeSessionVO = ApiClient.closeCallSessionSync(MainActivity.IP, USERSESSIONID);
+            Log.i(TAG, "CloseSessionVO: " + closeSessionVO.toString());
+        }).start();
 
         Log.i(TAG, "Recording stopped successfully.");
         LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(ACTION_RECORDING_STOPPED));
@@ -359,6 +364,8 @@ public class VoipRecordService extends Service {
     public void recordHealth() {
         Thread recordHealth = new Thread(() -> {
             while (isRecording) {
+                ApiClient.postHealthStatusSync(MainActivity.IP, USERSESSIONID, username);
+
                 int waitTime = new Random().nextInt(60);
                 try {
                     Thread.sleep(waitTime * 1000);
@@ -366,7 +373,6 @@ public class VoipRecordService extends Service {
                     Thread.currentThread().interrupt();
                     break;
                 }
-                ApiClient.postHealthStatusSync(MainActivity.IP, USERSESSIONID, username);
             }
         });
         recordHealth.start();

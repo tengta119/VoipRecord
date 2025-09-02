@@ -2,7 +2,7 @@ package com.example.voiprecord.vo;
 import androidx.annotation.NonNull;
 
 import com.google.gson.annotations.SerializedName;
-public class UserSession {
+public class UserSessionVO {
     // @SerializedName 注解告诉 Gson JSON 中的 "session_id" 字段
     // 应该映射到这个名为 sessionId 的 Java 字段上。
     @SerializedName("session_id")

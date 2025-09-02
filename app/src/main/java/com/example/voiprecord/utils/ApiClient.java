@@ -6,6 +6,7 @@ import okhttp3.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.FormBody;
@@ -14,7 +15,8 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
-import com.example.voiprecord.vo.UserSession;
+import com.example.voiprecord.vo.CloseSessionVO;
+import com.example.voiprecord.vo.UserSessionVO;
 import com.google.gson.Gson;
 public class ApiClient {
 
@@ -29,7 +31,7 @@ public class ApiClient {
     /**
      * 根据 API 发起创建新会话的 POST 请求
      */
-    public static UserSession createNewCallSession(String baseUrl, String username) {
+    public static UserSessionVO createNewCallSession(String baseUrl, String username) {
 
 
         // 2. 使用 FormBody.Builder 构建请求体
@@ -45,7 +47,7 @@ public class ApiClient {
                 .post(formBody) // 指明是 POST 请求，并附上请求体
                 .build();
 
-        UserSession userSession;
+        UserSessionVO userSessionVO;
         try (Response response = client.newCall(request).execute()) {
 
             String jsonStr = "";
@@ -54,12 +56,12 @@ public class ApiClient {
             }
             // 2. 创建一个 Gson 实例
             Gson gson = new Gson();
-            userSession = gson.fromJson(jsonStr, UserSession.class);
-            Log.d(TAG, "userSession:" + userSession.toString());
+            userSessionVO = gson.fromJson(jsonStr, UserSessionVO.class);
+            Log.d(TAG, "userSession:" + userSessionVO.toString());
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        return userSession;
+        return userSessionVO;
     }
 
     /**
@@ -214,6 +216,53 @@ public class ApiClient {
             if (responseBody != null) {
                 responseBody.string();
             }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * 以同步方式关闭一个通话会话.
+     *
+     * @param baseUrl   API 的基础 URL, 例如 "<a href="http://your-server.com">...</a>"
+     * @param sessionId 要关闭的会话 ID
+     * @return 解析后的 CloseSessionResponse 对象
+     */
+    public static CloseSessionVO closeCallSessionSync(String baseUrl, String sessionId){
+        // 1. 构建完整的 URL，包含路径参数
+        // 使用 HttpUrl.Builder 来安全地构建 URL，避免手动拼接字符串带来的错误
+        HttpUrl url = Objects.requireNonNull(HttpUrl.parse(baseUrl))
+                .newBuilder()
+                .addPathSegment("api")
+                .addPathSegment("v1")
+                .addPathSegment("call")
+                .addPathSegment(sessionId) // 动态添加 session_id
+                .addPathSegment("close")
+                .build();
+
+        System.out.println("Requesting URL: " + url);
+
+        // 2. 创建 Request 对象，指定为 GET 请求
+        Request request = new Request.Builder()
+                .url(url)
+                .get() // 明确指定为 GET 请求 (默认也是 GET)
+                .build();
+
+        // 3. 发起同步请求并处理响应
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) {
+                throw new IOException("Unexpected HTTP code " + response.code() + " " + response.message());
+            }
+
+            ResponseBody responseBody = response.body();
+            if (responseBody == null) {
+                throw new IOException("Received empty response body");
+            }
+
+            // 4. 使用 Gson 将 JSON 字符串解析为 Java 对象
+            String jsonString = responseBody.string();
+            Gson gson = new Gson();
+            return gson.fromJson(jsonString, CloseSessionVO.class);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
