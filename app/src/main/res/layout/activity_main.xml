@@ -31,6 +31,7 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:hint="服务器地址 (例如 192.168.1.100)"
+    android:visibility="gone"
     android:inputType="textUri"
     android:background="@drawable/bg_edittext_rounded"
     android:padding="12dp"

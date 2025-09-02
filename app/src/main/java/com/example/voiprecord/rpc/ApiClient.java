@@ -1,4 +1,5 @@
-package com.example.voiprecord.utils;
+package com.example.voiprecord.rpc;
+
 import static androidx.constraintlayout.helper.widget.MotionEffect.TAG;
 
 import android.util.Log;
@@ -15,23 +16,26 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
+import com.example.voiprecord.MainActivity;
 import com.example.voiprecord.vo.CloseSessionVO;
 import com.example.voiprecord.vo.UserSessionVO;
 import com.google.gson.Gson;
+
 public class ApiClient {
 
     // 推荐做法：全局共享一个 OkHttpClient 实例
-    private static final OkHttpClient client = new OkHttpClient.Builder()
+    private final OkHttpClient client = new OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS) // 连接超时
             .readTimeout(30, TimeUnit.SECONDS)    // 读取超时
             .writeTimeout(30, TimeUnit.SECONDS)   // 写入超时
+            .addInterceptor(new RetryInterceptor(MainActivity.MAXRETRIY)) // 添加拦截器，设置重试次数
             .build();
 
 
     /**
      * 根据 API 发起创建新会话的 POST 请求
      */
-    public static UserSessionVO createNewCallSession(String baseUrl, String username) {
+    public UserSessionVO createNewCallSession(String baseUrl, String username) {
 
 
         // 2. 使用 FormBody.Builder 构建请求体
@@ -47,7 +51,7 @@ public class ApiClient {
                 .post(formBody) // 指明是 POST 请求，并附上请求体
                 .build();
 
-        UserSessionVO userSessionVO;
+        UserSessionVO userSessionVO = null;
         try (Response response = client.newCall(request).execute()) {
 
             String jsonStr = "";
@@ -59,7 +63,7 @@ public class ApiClient {
             userSessionVO = gson.fromJson(jsonStr, UserSessionVO.class);
             Log.d(TAG, "userSession:" + userSessionVO.toString());
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            Log.e(TAG, "创建新会话失败: " + e.getMessage());
         }
         return userSessionVO;
     }
@@ -73,7 +77,7 @@ public class ApiClient {
      * @param chunkIndex  分块序号, 从 0 开始
      * @param audioFile   要上传的本地音频文件 (File对象)
      */
-    public static void uploadAudioChunk(String baseUrl, String sessionId, String channelName, int chunkIndex, File audioFile){
+    public void uploadAudioChunk(String baseUrl, String sessionId, String channelName, int chunkIndex, File audioFile){
 
 
         // 1. 遵循API要求，生成文件名
@@ -116,11 +120,9 @@ public class ApiClient {
             ResponseBody responseBody = response.body();
             String responseBodyString = (responseBody != null) ? responseBody.string() : "Response body is null";
 
-            // 请求成功
-            System.out.println("上传成功! 状态码: " + response.code());
-            System.out.println("服务器响应: " + responseBodyString);
+
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            Log.e(TAG, "上传音频分片失败: " + e.getMessage());
         }
     }
 
@@ -131,9 +133,8 @@ public class ApiClient {
      * @param sessionId 会话 ID
      * @param bytes     要上传的图片文件的字节数组
      * @param filename  要上传的文件名 (例如 "screenshot.png")，用于服务器保存和判断MIME类型
-     * @throws IOException 如果网络请求失败或服务器返回非成功状态码
      */
-    public static void uploadScreenshot(String baseUrl, String sessionId, byte[] bytes, String filename) throws IOException {
+    public void uploadScreenshot(String baseUrl, String sessionId, byte[] bytes, String filename){
         // 1. 根据传入的文件名确定 MIME 类型
         MediaType mediaType = MediaType.parse("application/octet-stream"); // 默认的二进制类型
         if (filename.toLowerCase().endsWith(".png")) {
@@ -170,12 +171,14 @@ public class ApiClient {
             if (!response.isSuccessful()) {
                 // 打印更详细的错误信息
                 String errorBody = response.body() != null ? response.body().string() : "无响应体";
-                throw new IOException("请求失败: " + response.code() + " " + response.message() + ", 响应体: " + errorBody);
+                Log.e(TAG, "上传截图失败: " + response.code() + " " + response.message() + " " + errorBody);
             }
 
             // 获取响应体并返回
             // 注意：response.body().string() 只能调用一次
             Log.d(TAG, "上传截图成功: " + response.body().string());
+        } catch (IOException e) {
+            Log.e(TAG, "上传截图失败: " + e.getMessage());
         }
     }
 
@@ -188,7 +191,7 @@ public class ApiClient {
      * @param version  客户端版本号
      * @param username 使用人姓名
      */
-    public static void postHealthStatusSync(String baseUrl, String version, String username) {
+    public void postHealthStatusSync(String baseUrl, String version, String username) {
         // 2. 构建请求体 (Request Body)
         // Content-Type 是 application/x-www-form-urlencoded，所以使用 FormBody.
         RequestBody formBody = new FormBody.Builder()
@@ -217,7 +220,7 @@ public class ApiClient {
                 responseBody.string();
             }
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            Log.e(TAG, "上报客户端健康状态失败: " + e.getMessage());
         }
     }
 
@@ -228,7 +231,7 @@ public class ApiClient {
      * @param sessionId 要关闭的会话 ID
      * @return 解析后的 CloseSessionResponse 对象
      */
-    public static CloseSessionVO closeCallSessionSync(String baseUrl, String sessionId){
+    public CloseSessionVO closeCallSessionSync(String baseUrl, String sessionId){
         // 1. 构建完整的 URL，包含路径参数
         // 使用 HttpUrl.Builder 来安全地构建 URL，避免手动拼接字符串带来的错误
         HttpUrl url = Objects.requireNonNull(HttpUrl.parse(baseUrl))
@@ -264,7 +267,8 @@ public class ApiClient {
             Gson gson = new Gson();
             return gson.fromJson(jsonString, CloseSessionVO.class);
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            Log.e(TAG, "关闭会话失败: " + e.getMessage());
         }
+        return null;
     }
 }

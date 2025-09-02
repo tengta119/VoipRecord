@@ -46,6 +46,8 @@ public class MainActivity extends AppCompatActivity {
     private static final long MAX_FOLDER_SIZE_BYTES = 5L * 1024 * 1024 * 1024;
     // 清理内存的频率
     private static final int CLEAN_MEMORY_FREQUENCY = 10000;
+    // 请求重试的次数
+    public static final int MAXRETRIY = 10;
     private EditText etUsername, etServer;
 
     private ImageButton recordButton;
@@ -58,7 +60,7 @@ public class MainActivity extends AppCompatActivity {
         STOPPING    // 正在停止
     }
     private RecordingState currentState = RecordingState.IDLE;
-    public static String IP = "http://192.168.15.55:8080";
+    public static String IP = "http://192.168.15.96:8080";
     private class ModeChangeListener implements AudioManager.OnModeChangedListener {
         @Override
         public void onModeChanged(int mode) {
@@ -120,9 +122,8 @@ public class MainActivity extends AppCompatActivity {
 
         btnStartFloating.setOnClickListener(v -> {
             String username = etUsername.getText().toString().trim();
-            String server = etServer.getText().toString().trim();
             // 检查用户名和服务器地址是否为空
-            if (username.isEmpty() || server.isEmpty()) {
+            if (username.isEmpty()) {
                 Toast.makeText(this, "请填写用户名和服务器地址", Toast.LENGTH_SHORT).show();
                 return;
             }
@@ -130,7 +131,7 @@ public class MainActivity extends AppCompatActivity {
             // 保存输入
             prefs.edit()
                     .putString("username", username)
-                    .putString("server", server)
+                    .putString("server", "127.0.0.1")
                     .apply();
 
             // 检查悬浮窗权限 (Settings.canDrawOverlays(this))。如果未授予，则会跳转到系统设置页面让用户手动开启。

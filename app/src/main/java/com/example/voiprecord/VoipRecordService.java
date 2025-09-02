@@ -34,7 +34,7 @@ import androidx.core.app.NotificationCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 
-import com.example.voiprecord.utils.ApiClient;
+import com.example.voiprecord.rpc.ApiClient;
 import com.example.voiprecord.utils.VoipUtil;
 import com.example.voiprecord.vo.CloseSessionVO;
 import com.example.voiprecord.vo.UserSessionVO;
@@ -215,7 +215,7 @@ public class VoipRecordService extends Service {
             playbackThread = new Thread(() -> recordAndSendAudio(playbackRecord, "ch1"));
             screenshotThread = new Thread(this::captureAndSendScreenshots);
             CompletableFuture<UserSessionVO> completableFuture = CompletableFuture.supplyAsync(() -> {
-                UserSessionVO userSessionVO = ApiClient.createNewCallSession(MainActivity.IP, username);
+                UserSessionVO userSessionVO = new ApiClient().createNewCallSession(MainActivity.IP, username);
                 AUDIO_CHUNK_INTERVAL_MS = userSessionVO.getAudioChunkSize() * 1000;
                 IMAGE_FREQUENCY = userSessionVO.getImageFrequency() * 1000;
                 USERSESSIONID = userSessionVO.getSessionId();
@@ -282,7 +282,7 @@ public class VoipRecordService extends Service {
             } catch (IOException e) {
                 Log.e(TAG, "File write error: " + file.getName(), e);
             }
-            ApiClient.uploadAudioChunk(MainActivity.IP, USERSESSIONID, direction, count, file);
+            new ApiClient().uploadAudioChunk(MainActivity.IP, USERSESSIONID, direction, count, file);
             count++;
             Log.i(TAG, "Sent " + direction + " chunk: " + file.getName());
         }
@@ -304,7 +304,7 @@ public class VoipRecordService extends Service {
 
                 Image image = imageReader.acquireLatestImage();
                 byte[] jpegBytes = VoipUtil.convertImageToJpegBytes(image, width, height);
-                ApiClient.uploadScreenshot(MainActivity.IP, USERSESSIONID, jpegBytes, "image.jpg");
+                new ApiClient().uploadScreenshot(MainActivity.IP, USERSESSIONID, jpegBytes, "image.jpg");
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -353,8 +353,10 @@ public class VoipRecordService extends Service {
         }
 
         new Thread(() -> {
-            CloseSessionVO closeSessionVO = ApiClient.closeCallSessionSync(MainActivity.IP, USERSESSIONID);
-            Log.i(TAG, "CloseSessionVO: " + closeSessionVO.toString());
+            CloseSessionVO closeSessionVO = new ApiClient().closeCallSessionSync(MainActivity.IP, USERSESSIONID);
+            if (closeSessionVO != null) {
+                Log.i(TAG, "CloseSessionVO: " + closeSessionVO);
+            }
         }).start();
 
         Log.i(TAG, "Recording stopped successfully.");
@@ -364,7 +366,7 @@ public class VoipRecordService extends Service {
     public void recordHealth() {
         Thread recordHealth = new Thread(() -> {
             while (isRecording) {
-                ApiClient.postHealthStatusSync(MainActivity.IP, USERSESSIONID, username);
+                new ApiClient().postHealthStatusSync(MainActivity.IP, USERSESSIONID, username);
 
                 int waitTime = new Random().nextInt(60);
                 try {
