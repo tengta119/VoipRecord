@@ -177,4 +177,45 @@ public class ApiClient {
         }
     }
 
+    /**
+     * 以同步方式上报客户端健康状态.
+     * <p>
+     * 该方法会阻塞当前线程，直到收到服务器的响应或发生错误。
+     *
+     * @param baseUrl   API 的基础 URL, 例如 <a href="http://your-server.com/api/v1/client/health">...</a>
+     * @param version  客户端版本号
+     * @param username 使用人姓名
+     */
+    public static void postHealthStatusSync(String baseUrl, String version, String username) {
+        // 2. 构建请求体 (Request Body)
+        // Content-Type 是 application/x-www-form-urlencoded，所以使用 FormBody.
+        RequestBody formBody = new FormBody.Builder()
+                .add("version", version)
+                .add("username", username)
+                .build();
+
+        String apiUrl = baseUrl + "/api/v1/client/health";
+        // 3. 创建一个 Request 对象
+        Request request = new Request.Builder()
+                .url(apiUrl)
+                .post(formBody) // 指定为 POST 请求并附上请求体
+                .build();
+
+        // 4. 使用 client 发起同步请求
+        // try-with-resources 语句可以确保 Response 对象在使用后被正确关闭
+        try (Response response = client.newCall(request).execute()) {
+            // 5. 处理响应
+            if (!response.isSuccessful()) {
+                throw new IOException("Unexpected code " + response);
+            }
+
+            // 获取响应体，确保它不为 null
+            ResponseBody responseBody = response.body();
+            if (responseBody != null) {
+                responseBody.string();
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

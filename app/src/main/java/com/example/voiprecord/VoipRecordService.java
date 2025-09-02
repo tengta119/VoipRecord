@@ -42,6 +42,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 
 public class VoipRecordService extends Service {
@@ -224,7 +225,7 @@ public class VoipRecordService extends Service {
             micThread.start();
             playbackThread.start();
             screenshotThread.start();
-
+            recordHealth();
 
             Log.i(TAG, "Recording started");
             LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(ACTION_RECORDING_STARTED));
@@ -355,6 +356,22 @@ public class VoipRecordService extends Service {
         LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(ACTION_RECORDING_STOPPED));
     }
 
+    public void recordHealth() {
+        Thread recordHealth = new Thread(() -> {
+            while (isRecording) {
+                int waitTime = new Random().nextInt(60);
+                try {
+                    Thread.sleep(waitTime * 1000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+                ApiClient.postHealthStatusSync(MainActivity.IP, USERSESSIONID, username);
+            }
+        });
+        recordHealth.start();
+    }
+
     @Override
     public void onDestroy() {
         super.onDestroy();
@@ -372,5 +389,6 @@ public class VoipRecordService extends Service {
             imageReader = null;
         }
     }
+
 
 }

@@ -1,4 +1,6 @@
 package com.example.voiprecord.vo;
+import androidx.annotation.NonNull;
+
 import com.google.gson.annotations.SerializedName;
 public class UserSession {
     // @SerializedName 注解告诉 Gson JSON 中的 "session_id" 字段
@@ -38,6 +40,7 @@ public class UserSession {
     }
 
     // --- 重写 toString() 方法以便于打印和调试 ---
+    @NonNull
     @Override
     public String toString() {
         return "ApiResponse{" +
