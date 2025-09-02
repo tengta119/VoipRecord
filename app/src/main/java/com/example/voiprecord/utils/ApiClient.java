@@ -1,4 +1,4 @@
-package com.example.voiprecord;
+package com.example.voiprecord.utils;
 import static androidx.constraintlayout.helper.widget.MotionEffect.TAG;
 
 import android.util.Log;
@@ -6,6 +6,7 @@ import okhttp3.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 import okhttp3.FormBody;
 import okhttp3.OkHttpClient;
@@ -13,17 +14,23 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
-import com.example.voiprecord.VO.UserSession;
+import com.example.voiprecord.vo.UserSession;
 import com.google.gson.Gson;
 public class ApiClient {
+
+    // 推荐做法：全局共享一个 OkHttpClient 实例
+    private static final OkHttpClient client = new OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS) // 连接超时
+            .readTimeout(30, TimeUnit.SECONDS)    // 读取超时
+            .writeTimeout(30, TimeUnit.SECONDS)   // 写入超时
+            .build();
+
 
     /**
      * 根据 API 发起创建新会话的 POST 请求
      */
     public static UserSession createNewCallSession(String baseUrl, String username) {
 
-        // 1. 创建 OkHttpClient 实例
-        OkHttpClient client = new OkHttpClient();
 
         // 2. 使用 FormBody.Builder 构建请求体
         // 这会自动处理 URL 编码和设置 Content-Type 为 application/x-www-form-urlencoded
@@ -39,7 +46,7 @@ public class ApiClient {
                 .build();
 
         UserSession userSession;
-        try (Response response = client.newCall(request).execute();) {
+        try (Response response = client.newCall(request).execute()) {
 
             String jsonStr = "";
             if (response.body() != null) {
@@ -63,12 +70,9 @@ public class ApiClient {
      * @param channelName 声道名, 例如 "ch0", "ch1"
      * @param chunkIndex  分块序号, 从 0 开始
      * @param audioFile   要上传的本地音频文件 (File对象)
-     * @throws IOException 如果网络请求或文件读取失败
      */
     public static void uploadAudioChunk(String baseUrl, String sessionId, String channelName, int chunkIndex, File audioFile){
 
-        // 1. 创建 OkHttpClient 实例
-        OkHttpClient client = new OkHttpClient();
 
         // 1. 遵循API要求，生成文件名
         String apiFilename = String.format("%s_%d.wav", channelName, chunkIndex);
@@ -117,4 +121,60 @@ public class ApiClient {
             throw new RuntimeException(e);
         }
     }
+
+    /**
+     * 上传截图图片到服务器（通过字节数组）
+     *
+     * @param baseUrl   API 的基础 URL
+     * @param sessionId 会话 ID
+     * @param bytes     要上传的图片文件的字节数组
+     * @param filename  要上传的文件名 (例如 "screenshot.png")，用于服务器保存和判断MIME类型
+     * @throws IOException 如果网络请求失败或服务器返回非成功状态码
+     */
+    public static void uploadScreenshot(String baseUrl, String sessionId, byte[] bytes, String filename) throws IOException {
+        // 1. 根据传入的文件名确定 MIME 类型
+        MediaType mediaType = MediaType.parse("application/octet-stream"); // 默认的二进制类型
+        if (filename.toLowerCase().endsWith(".png")) {
+            mediaType = MediaType.parse("image/png");
+        } else if (filename.toLowerCase().endsWith(".jpg") || filename.toLowerCase().endsWith(".jpeg")) {
+            mediaType = MediaType.parse("image/jpeg");
+        }
+
+        // 2. 构建请求体 (Request Body)
+        //    使用 MultipartBody 来构建 multipart/form-data 格式的请求
+        RequestBody requestBody = new MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart(
+                        "image", // 这是 API 定义的参数名 (key)
+                        filename, // 文件名
+                        RequestBody.create(bytes, mediaType) // 使用字节数组创建文件内容
+                )
+                .build();
+
+        // 3. 构建完整的请求 URL
+        String url = baseUrl + "/api/v1/call/" + sessionId + "/img";
+        System.out.println("请求 URL: " + url);
+
+        // 4. 构建请求 (Request)
+        Request request = new Request.Builder()
+                .url(url)
+                .post(requestBody)
+                .build();
+
+        // 5. 发起同步请求并处理响应
+        //    使用 try-with-resources 确保 Response 对象被正确关闭
+        try (Response response = client.newCall(request).execute()) {
+            // 检查响应是否成功 (HTTP 状态码 200-299)
+            if (!response.isSuccessful()) {
+                // 打印更详细的错误信息
+                String errorBody = response.body() != null ? response.body().string() : "无响应体";
+                throw new IOException("请求失败: " + response.code() + " " + response.message() + ", 响应体: " + errorBody);
+            }
+
+            // 获取响应体并返回
+            // 注意：response.body().string() 只能调用一次
+            Log.d(TAG, "上传截图成功: " + response.body().string());
+        }
+    }
+
 }

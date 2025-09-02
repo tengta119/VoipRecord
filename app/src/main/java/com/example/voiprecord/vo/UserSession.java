@@ -1,4 +1,4 @@
-package com.example.voiprecord.VO;
+package com.example.voiprecord.vo;
 import com.google.gson.annotations.SerializedName;
 public class UserSession {
     // @SerializedName 注解告诉 Gson JSON 中的 "session_id" 字段

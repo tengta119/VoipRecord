@@ -34,30 +34,22 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import java.io.File;
 import java.io.FileFilter;
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
-
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
-import okhttp3.ResponseBody;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final int OVERLAY_PERMISSION_CODE = 1001;
     private static final int REQUEST_PERMISSIONS_CODE = 1002;
 
+    // 最大缓存音频文件的大小
     private static final long MAX_FOLDER_SIZE_BYTES = 5L * 1024 * 1024 * 1024;
-
+    // 清理内存的频率
+    private static final int CLEAN_MEMORY_FREQUENCY = 10000;
     private EditText etUsername, etServer;
-    private Button btnRequestPermission, btnStartFloating, btnStopFloating;
 
     private ImageButton recordButton;
     private TextView statusText;
-
-    private Thread deleteRecordFile;
 
     private enum RecordingState {
         IDLE,       // 空闲
@@ -82,8 +74,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private AudioManager audioManager;
-    private ModeChangeListener modeChangeListener;
     private final BroadcastReceiver recordingStateReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -113,11 +103,11 @@ public class MainActivity extends AppCompatActivity {
         etUsername = findViewById(R.id.etUsername);
         etServer = findViewById(R.id.etServer);
         // 申请录音权限
-        btnRequestPermission = findViewById(R.id.btnRequestPermission);
+        Button btnRequestPermission = findViewById(R.id.btnRequestPermission);
         // 启动悬浮窗
-        btnStartFloating = findViewById(R.id.btnStartFloating);
+        Button btnStartFloating = findViewById(R.id.btnStartFloating);
         // 停止悬浮窗
-        btnStopFloating = findViewById(R.id.btnStopFloating);
+        Button btnStopFloating = findViewById(R.id.btnStopFloating);
 
         // SharedPreferences 是安卓提供的一个轻量级存储方案，适合存放简单的键值对数据
         // 读取上次保存的用户名和服务器
@@ -182,17 +172,18 @@ public class MainActivity extends AppCompatActivity {
         LocalBroadcastManager.getInstance(this).registerReceiver(recordingStateReceiver, filter);
 
         // 初始化：获取系统音频管理器。
-        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
-        modeChangeListener = new ModeChangeListener();
+        AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        ModeChangeListener modeChangeListener = new ModeChangeListener();
         // 册了一个监听器，用于监视系统音频模式的变化
         audioManager.addOnModeChangedListener(getMainExecutor(), modeChangeListener);
 
-        //删除缓存文件
+        //删除缓存的音频文件文件
         deleteFile();
     }
 
     private void deleteFile() {
-        deleteRecordFile = new Thread(() -> {
+        // 这里的逻辑和方案一中的 checkAndCleanVoipFolder 方法完全一样
+        Thread deleteRecordFile = new Thread(() -> {
             while (true) {
 
                 try {
@@ -202,28 +193,32 @@ public class MainActivity extends AppCompatActivity {
                         return;
                     }
 
-                    FileFilter pcmFileFilter = file -> file.isFile() && file.getName().startsWith("voip_") && file.getName().endsWith(".pcm");
+                    FileFilter pcmFileFilter = file -> file.isFile() && file.getName().endsWith(".wav");
                     File[] files = directory.listFiles(pcmFileFilter);
-
                     if (files == null || files.length == 0) {
                         return;
                     }
 
-                    List<File> pcmFiles = new ArrayList<>();
+                    List<File> wavFiles = new ArrayList<>();
                     long currentTotalSize = 0;
                     for (File file : files) {
                         currentTotalSize += file.length();
-                        pcmFiles.add(file);
+                        wavFiles.add(file);
                     }
 
                     if (currentTotalSize >= MAX_FOLDER_SIZE_BYTES) {
-                        pcmFiles.sort(Comparator.comparing(File::getName));
-                        while (currentTotalSize >= MAX_FOLDER_SIZE_BYTES && !pcmFiles.isEmpty()) {
-                            File oldestFile = pcmFiles.get(0);
+                        wavFiles.sort((a, b) -> {
+                            Integer numa = Integer.parseInt(a.getName().split("_")[0]);
+                            Integer numb = Integer.parseInt(b.getName().split("_")[0]);
+                            return numa.compareTo(numb);
+                        });
+                        Log.d(TAG, "缓存的音频: " + wavFiles);
+                        while (currentTotalSize >= MAX_FOLDER_SIZE_BYTES && !wavFiles.isEmpty()) {
+                            File oldestFile = wavFiles.get(0);
                             long oldestFileSize = oldestFile.length();
                             if (oldestFile.delete()) {
                                 currentTotalSize -= oldestFileSize;
-                                pcmFiles.remove(0);
+                                wavFiles.remove(0);
                             } else {
                                 Log.e(TAG, "Failed to delete file: " + oldestFile.getAbsolutePath());
                             }
@@ -235,9 +230,9 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 try {
-                    Thread.sleep(10000);
+                    Thread.sleep(CLEAN_MEMORY_FREQUENCY);
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    Log.e(TAG, "清理任务被中断", e);
                 }
             }
         });
@@ -278,7 +273,7 @@ public class MainActivity extends AppCompatActivity {
         // 启动录音服务
         Intent serviceIntent = new Intent(this, VoipRecordService.class);
         serviceIntent.putExtra("command", "start");
-        // Android O+ 建议使用 startForegroundService，如果 VoipRecordService 会在 onStartCommand 里调用 startForeground
+        // startForegroundService 有问题 debug todo
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent);
         } else {
@@ -374,7 +369,12 @@ public class MainActivity extends AppCompatActivity {
         }else if(requestCode == 2000) {
             MediaProjectionManager mediaProjectionManager = (MediaProjectionManager) getSystemService(MEDIA_PROJECTION_SERVICE);
             // 这个 MediaProjection 对象是一个令牌 (Token)，是进行屏幕捕捉的关键。
-            MediaProjection mediaProjection = mediaProjectionManager.getMediaProjection(resultCode, data);
+            MediaProjection mediaProjection = null;
+            if (data != null) {
+                mediaProjection = mediaProjectionManager.getMediaProjection(resultCode, data);
+            } else {
+                Log.e(TAG, "MediaProjection is null");
+            }
             // 这行代码通过一个静态方法，将获取到的 MediaProjection 令牌传递给了另一个服务 VoipRecordService
             VoipRecordService.setMediaProjection(mediaProjection);
             Toast.makeText(this, "共享权限已授予", Toast.LENGTH_SHORT).show();

