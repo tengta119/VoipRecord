@@ -57,7 +57,8 @@ public class FloatingControlService extends Service {
         IDLE,       // 空闲
         STARTING,   // 正在启动
         RECORDING,  // 录音中
-        STOPPING    // 正在停止
+        STOPPING,    // 正在停止
+        FAIL,       // 失败
     }
     private RecordingState currentState = RecordingState.IDLE;
 

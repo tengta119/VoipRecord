@@ -166,6 +166,13 @@ public class VoipRecordService extends Service {
     }
 
     private void startRecording() {
+
+        if (!VoipUtil.isWifiConnected(this)) {
+            LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(LocalBroadcastRecord.ACTION_RECORDING_FAIL));
+            Log.e(TAG, "使用非 Wife 则退出连接");
+            return;
+        }
+
         if (isRecording) {
             Log.w(TAG, "Recording already in progress.");
             return;

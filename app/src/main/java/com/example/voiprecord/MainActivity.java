@@ -59,7 +59,8 @@ public class MainActivity extends AppCompatActivity {
         IDLE,       // 空闲
         STARTING,   // 正在启动
         RECORDING,  // 录音中
-        STOPPING    // 正在停止
+        STOPPING,    // 正在停止
+        FAIL,       // 失败
     }
     private RecordingState currentState = RecordingState.IDLE;
     public static String IP = "http://audio.api.nycjy.cn";
@@ -94,6 +95,10 @@ public class MainActivity extends AppCompatActivity {
                     break;
                 case LocalBroadcastRecord.ACTION_RECORDING_STOPPED:
                     currentState = RecordingState.IDLE;
+                    updateRecordButtonUI();
+                    break;
+                case LocalBroadcastRecord.ACTION_RECORDING_FAIL:
+                    currentState = RecordingState.FAIL;
                     updateRecordButtonUI();
                     break;
                 default:
@@ -174,6 +179,7 @@ public class MainActivity extends AppCompatActivity {
         IntentFilter filter = new IntentFilter();
         filter.addAction(LocalBroadcastRecord.ACTION_RECORDING_STARTED);
         filter.addAction(LocalBroadcastRecord.ACTION_RECORDING_STOPPED);
+        filter.addAction(LocalBroadcastRecord.ACTION_RECORDING_FAIL);
         LocalBroadcastManager.getInstance(this).registerReceiver(recordingStateReceiver, filter);
 
         // 初始化：获取系统音频管理器。
@@ -266,6 +272,13 @@ public class MainActivity extends AppCompatActivity {
                 updateRecordButtonUI();
                 stopRecording();
                 break;
+            case FAIL:
+                // 从“空闲”切换到“正在启动”
+                currentState = RecordingState.STARTING;
+                // 立即更新UI以显示中间状态
+                updateRecordButtonUI();
+                startRecording();
+                break;
             case STARTING:
             case STOPPING:
                 // 在中间状态时，不执行任何操作，防止用户重复点击
@@ -313,6 +326,12 @@ public class MainActivity extends AppCompatActivity {
                 recordButton.setBackgroundResource(R.drawable.bg_record_active);
                 recordButton.setImageResource(R.drawable.ic_stop_white);
                 statusText.setText("录音中");
+                break;
+            case FAIL:
+                recordButton.setEnabled(true);
+                recordButton.setBackgroundResource(R.drawable.bg_record_idle);
+                recordButton.setImageResource(R.drawable.ic_mic);
+                statusText.setText("Wife 连接失败，请重试");
                 break;
             case STARTING:
             case STOPPING:

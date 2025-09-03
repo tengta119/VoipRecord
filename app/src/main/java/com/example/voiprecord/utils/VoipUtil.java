@@ -10,7 +10,11 @@ import java.nio.charset.StandardCharsets;
 import android.graphics.Bitmap;
 import android.media.Image;
 import java.io.ByteArrayOutputStream;
-
+import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.Network;
+import android.net.NetworkCapabilities;
+import android.os.Build;
 public class VoipUtil {
 
     public static byte[] createWavHeader(long pcmDataSize) throws IOException {
@@ -101,6 +105,43 @@ public class VoipUtil {
         } finally {
             // 5. 非常重要：关闭 image 对象以释放内存资源，让 ImageReader 可以接收下一张图片
             image.close();
+        }
+    }
+
+    /**
+     * 检查设备当前是否连接到 Wi-Fi 网络。
+     * @param context Context
+     * @return 如果连接到 Wi-Fi 则返回 true，否则返回 false。
+     */
+    public static boolean isWifiConnected(Context context) {
+        // 获取系统连接管理器
+        ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (connectivityManager == null) {
+            return false;
+        }
+
+        // 对于 Android 10 (API 29) 及以上版本
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // 获取当前活跃网络的网络能力
+            Network activeNetwork = connectivityManager.getActiveNetwork();
+            if (activeNetwork == null) {
+                return false;
+            }
+            NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(activeNetwork);
+            if (capabilities == null) {
+                return false;
+            }
+            // 检查网络传输类型是否为 Wi-Fi
+            return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+        }
+        // 对于旧版本
+        else {
+            android.net.NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
+            if (networkInfo == null || !networkInfo.isConnected()) {
+                return false;
+            }
+            // 检查网络类型是否为 Wi-Fi
+            return networkInfo.getType() == ConnectivityManager.TYPE_WIFI;
         }
     }
 
