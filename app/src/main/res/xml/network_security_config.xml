@@ -7,6 +7,6 @@
     </base-config>
 
     <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">192.168.15.96</domain>
+        <domain includeSubdomains="false">audio.api.nycjy.cn</domain>
     </domain-config>
 </network-security-config>

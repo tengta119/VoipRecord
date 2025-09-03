@@ -60,7 +60,7 @@ public class MainActivity extends AppCompatActivity {
         STOPPING    // 正在停止
     }
     private RecordingState currentState = RecordingState.IDLE;
-    public static String IP = "http://192.168.15.96:8080";
+    public static String IP = "http://audio.api.nycjy.cn";
     private class ModeChangeListener implements AudioManager.OnModeChangedListener {
         @Override
         public void onModeChanged(int mode) {
@@ -69,9 +69,11 @@ public class MainActivity extends AppCompatActivity {
             if (mode == AudioManager.MODE_IN_COMMUNICATION) {
                 currentState = RecordingState.STARTING;
                 updateRecordButtonUI();
+                startRecording();
             } else if (mode == AudioManager.MODE_NORMAL) {
                 currentState = RecordingState.STOPPING;
                 updateRecordButtonUI();
+                stopRecording();
             }
         }
     }
