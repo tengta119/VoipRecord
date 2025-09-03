@@ -20,6 +20,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.provider.Settings;
 import android.util.Log;
+import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
@@ -33,6 +34,7 @@ import androidx.core.content.ContextCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.example.voiprecord.constant.LocalBroadcastRecord;
+import com.example.voiprecord.utils.HistoryRecordUtil;
 
 import java.io.File;
 import java.io.FileFilter;
@@ -45,9 +47,9 @@ public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_PERMISSIONS_CODE = 1002;
 
     // 最大缓存音频文件的大小
-    private static final long MAX_FOLDER_SIZE_BYTES = 5L * 1024 * 1024 * 1024;
+    public static final long MAX_FOLDER_SIZE_BYTES = 5L * 1024 * 1024 * 1024;
     // 清理内存的频率
-    private static final int CLEAN_MEMORY_FREQUENCY = 10000;
+    public static final int CLEAN_MEMORY_FREQUENCY = 10000;
     // 请求重试的次数
     public static final int MAXRETRIY = 10;
     private EditText etUsername, etServer;
@@ -133,7 +135,7 @@ public class MainActivity extends AppCompatActivity {
             String username = etUsername.getText().toString().trim();
             // 检查用户名和服务器地址是否为空
             if (username.isEmpty()) {
-                Toast.makeText(this, "请填写用户名和服务器地址", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "请填写用户名", Toast.LENGTH_SHORT).show();
                 return;
             }
 
@@ -189,68 +191,31 @@ public class MainActivity extends AppCompatActivity {
         audioManager.addOnModeChangedListener(getMainExecutor(), modeChangeListener);
 
         //删除缓存的音频文件文件
-        deleteFile();
-    }
+        HistoryRecordUtil.deleteFile();
 
-    private void deleteFile() {
-        // 这里的逻辑和方案一中的 checkAndCleanVoipFolder 方法完全一样
-        Thread deleteRecordFile = new Thread(() -> {
-            while (true) {
+        // 1. 找到触发跳转的按钮
+        Button navigateButton = findViewById(R.id.btnNavigateToHistoryRecord);
 
-                try {
-                    // 这里的逻辑和方案一中的 checkAndCleanVoipFolder 方法完全一样
-                    File directory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-                    if (!directory.exists()) {
-                        return;
-                    }
+        // 2. 为按钮设置点击监听器
+        navigateButton.setOnClickListener(v -> {
+            // 3. 创建一个 Intent（意图）来启动新 Activity
+            // 参数一是当前上下文 (this)，参数二是目标 Activity 的类
+            Intent intent = new Intent(MainActivity.this, HistoryRecord.class);
 
-                    FileFilter pcmFileFilter = file -> file.isFile() && file.getName().endsWith(".wav");
-                    File[] files = directory.listFiles(pcmFileFilter);
-                    if (files == null || files.length == 0) {
-                        return;
-                    }
-
-                    List<File> wavFiles = new ArrayList<>();
-                    long currentTotalSize = 0;
-                    for (File file : files) {
-                        currentTotalSize += file.length();
-                        wavFiles.add(file);
-                    }
-
-                    if (currentTotalSize >= MAX_FOLDER_SIZE_BYTES) {
-                        wavFiles.sort((a, b) -> {
-                            Integer numa = Integer.parseInt(a.getName().split("_")[0]);
-                            Integer numb = Integer.parseInt(b.getName().split("_")[0]);
-                            return numa.compareTo(numb);
-                        });
-                        Log.d(TAG, "缓存的音频: " + wavFiles);
-                        while (currentTotalSize >= MAX_FOLDER_SIZE_BYTES && !wavFiles.isEmpty()) {
-                            File oldestFile = wavFiles.get(0);
-                            long oldestFileSize = oldestFile.length();
-                            if (oldestFile.delete()) {
-                                currentTotalSize -= oldestFileSize;
-                                wavFiles.remove(0);
-                            } else {
-                                Log.e(TAG, "Failed to delete file: " + oldestFile.getAbsolutePath());
-                            }
-                        }
-                    }
-                    Log.d(TAG, "清理任务执行完毕。");
-                } catch (Exception e) {
-                    Log.e(TAG, "清理任务发生错误", e);
-                }
-
-                try {
-                    Thread.sleep(CLEAN_MEMORY_FREQUENCY);
-                } catch (InterruptedException e) {
-                    Log.e(TAG, "清理任务被中断", e);
-                }
-            }
+            // 4. 执行跳转
+            startActivity(intent);
         });
-        deleteRecordFile.start();
     }
 
     private void toggleRecording() {
+        etUsername = findViewById(R.id.etUsername);
+        SharedPreferences prefs = getSharedPreferences("voip_config", MODE_PRIVATE);
+        String username = etUsername.getText().toString().trim();
+        if (!username.isEmpty()) {
+            prefs.edit()
+                    .putString("username", String.valueOf(etUsername));
+        }
+
         if (VoipRecordService.getMediaProjection() == null) {
             Toast.makeText(this, "请先重新授权", Toast.LENGTH_SHORT).show();
             statusText.setText("后台清理后请重新授权");
@@ -331,7 +296,7 @@ public class MainActivity extends AppCompatActivity {
                 recordButton.setEnabled(true);
                 recordButton.setBackgroundResource(R.drawable.bg_record_idle);
                 recordButton.setImageResource(R.drawable.ic_mic);
-                statusText.setText("Wife 连接失败，请重试");
+                statusText.setText("Wifi 连接失败，请重试");
                 break;
             case STARTING:
             case STOPPING:

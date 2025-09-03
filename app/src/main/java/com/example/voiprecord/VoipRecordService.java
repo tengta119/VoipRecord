@@ -44,6 +44,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 
@@ -281,8 +284,9 @@ public class VoipRecordService extends Service {
                 Log.e(TAG, "Failed to create WAV header for " + direction, e);
                 continue;
             }
-
-            File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), count + "_voip_up_" + direction + "_" + username + ".wav");
+            String timestamp = new SimpleDateFormat("yyyyMMddHHmmss", Locale.US).format(new Date());
+            String fileName = timestamp + "=" + count + "=" +"_voip_up_" + "=" +direction + "=" + username + "=" + USERSESSIONID + "=" +".wav";
+            File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),  fileName);
             try(FileOutputStream fosChunk = new FileOutputStream(file)) {
                 fosChunk.write(wavData);
             } catch (IOException e) {

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/bg_edittext_rounded">
+    <TextView
+    android:id="@+id/tvUsername"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="Username"
+    android:textSize="18sp"
+    android:textStyle="bold"
+    android:textColor="?android:textColorPrimary" />
+
+    <TextView
+        android:id="@+id/tvTimestamp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="1725345946"
+        android:textSize="14sp"
+        android:layout_marginTop="4dp"
+        android:textColor="?android:textColorSecondary" />
+
+    <TextView
+        android:id="@+id/tvSessionId"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="SessionId: sessionId"
+        android:textSize="14sp"
+        android:layout_marginTop="4dp"
+        android:textColor="?android:textColorSecondary" />
+
+    <TextView
+        android:id="@+id/tvDirection"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Direction: up"
+        android:textSize="14sp"
+        android:layout_marginTop="4dp"
+        android:textColor="?android:textColorSecondary" />
+
+
+
+</LinearLayout>
