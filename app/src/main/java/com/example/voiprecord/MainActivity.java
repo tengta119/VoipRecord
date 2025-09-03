@@ -17,10 +17,8 @@ import android.media.projection.MediaProjectionManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.provider.Settings;
 import android.util.Log;
-import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
@@ -35,11 +33,6 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.example.voiprecord.constant.LocalBroadcastRecord;
 import com.example.voiprecord.utils.HistoryRecordUtil;
-
-import java.io.File;
-import java.io.FileFilter;
-import java.util.ArrayList;
-import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
