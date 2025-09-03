@@ -34,6 +34,7 @@ import androidx.core.app.NotificationCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 
+import com.example.voiprecord.constant.LocalBroadcastRecord;
 import com.example.voiprecord.rpc.ApiClient;
 import com.example.voiprecord.utils.VoipUtil;
 import com.example.voiprecord.vo.CloseSessionVO;
@@ -70,8 +71,6 @@ public class VoipRecordService extends Service {
     private VirtualDisplay virtualDisplay;
 
 
-    public static final String ACTION_RECORDING_STARTED = "com.example.voiprecord.RECORDING_STARTED";
-    public static final String ACTION_RECORDING_STOPPED = "com.example.voiprecord.RECORDING_STOPPED";
 
     // 音频块的录制时长
     public static int AUDIO_CHUNK_INTERVAL_MS = 15000 / 4;
@@ -229,7 +228,7 @@ public class VoipRecordService extends Service {
             recordHealth();
 
             Log.i(TAG, "Recording started");
-            LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(ACTION_RECORDING_STARTED));
+            LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(LocalBroadcastRecord.ACTION_RECORDING_STARTED));
 
         } catch (Exception e) {
             Log.e(TAG, "Recording start failed", e);
@@ -360,7 +359,7 @@ public class VoipRecordService extends Service {
         }).start();
 
         Log.i(TAG, "Recording stopped successfully.");
-        LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(ACTION_RECORDING_STOPPED));
+        LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(LocalBroadcastRecord.ACTION_RECORDING_STOPPED));
     }
 
     public void recordHealth() {

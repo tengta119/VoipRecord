@@ -30,6 +30,8 @@ import android.widget.TextView;
 import androidx.core.app.NotificationCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+import com.example.voiprecord.constant.LocalBroadcastRecord;
+
 public class FloatingControlService extends Service {
     private WindowManager windowManager;
     private View floatingView;
@@ -67,11 +69,11 @@ public class FloatingControlService extends Service {
                 return;
             }
             switch (action) {
-                case VoipRecordService.ACTION_RECORDING_STARTED:
+                case LocalBroadcastRecord.ACTION_RECORDING_STARTED:
                     currentState = RecordingState.RECORDING;
                     updateRecordButtonUI();
                     break;
-                case VoipRecordService.ACTION_RECORDING_STOPPED:
+                case LocalBroadcastRecord.ACTION_RECORDING_STOPPED:
                     currentState = RecordingState.IDLE;
                     updateRecordButtonUI();
                     break;
@@ -109,8 +111,8 @@ public class FloatingControlService extends Service {
 
         // ---注册广播接收器，监听 VoipRecordService 的广播 ---
         IntentFilter filter = new IntentFilter();
-        filter.addAction(VoipRecordService.ACTION_RECORDING_STARTED);
-        filter.addAction(VoipRecordService.ACTION_RECORDING_STOPPED);
+        filter.addAction(LocalBroadcastRecord.ACTION_RECORDING_STARTED);
+        filter.addAction(LocalBroadcastRecord.ACTION_RECORDING_STOPPED);
         LocalBroadcastManager.getInstance(this).registerReceiver(recordingStateReceiver, filter);
 
         // --- 在这里一次性找到所有视图 ---
