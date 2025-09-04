@@ -104,7 +104,7 @@
         android:id="@+id/btnNavigateToHistoryRecord"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="跳转到新页面"
+        android:text="跳转到历史记录"
         android:layout_marginTop="12dp" />
 
 </LinearLayout>

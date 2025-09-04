@@ -36,6 +36,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.example.voiprecord.constant.LocalBroadcastRecord;
 import com.example.voiprecord.rpc.ApiClient;
+import com.example.voiprecord.utils.HistoryRecordUtil;
 import com.example.voiprecord.utils.VoipUtil;
 import com.example.voiprecord.vo.CloseSessionVO;
 import com.example.voiprecord.vo.UserSessionVO;
@@ -253,7 +254,7 @@ public class VoipRecordService extends Service {
     private void recordAndSendAudio(AudioRecord audioRecord, String direction) {
         final int readBufferSize = 4096;
         byte[] readBuffer = new byte[readBufferSize];
-
+        ApiClient apiClient = new ApiClient();
         int count = 0;
         while (isRecording) {
 
@@ -274,25 +275,14 @@ public class VoipRecordService extends Service {
 
             // Step 2: 将音频数据转换为 wav 格式
             byte[] pcmData = pcmChunk.toByteArray();
-            byte[] wavData;
-            try {
-                byte[] header = VoipUtil.createWavHeader(pcmData.length);
-                wavData = new byte[header.length + pcmData.length];
-                System.arraycopy(header, 0, wavData, 0, header.length);
-                System.arraycopy(pcmData, 0, wavData, header.length, pcmData.length);
-            } catch (IOException e) {
-                Log.e(TAG, "Failed to create WAV header for " + direction, e);
-                continue;
-            }
+            byte[] wavData = VoipUtil.pcmToWav(pcmData.length, pcmData);
+
             String timestamp = new SimpleDateFormat("yyyyMMddHHmmss", Locale.US).format(new Date());
             String fileName = timestamp + "=" + count + "=" +"_voip_up_" + "=" +direction + "=" + username + "=" + USERSESSIONID + "=" +".wav";
-            File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),  fileName);
-            try(FileOutputStream fosChunk = new FileOutputStream(file)) {
-                fosChunk.write(wavData);
-            } catch (IOException e) {
-                Log.e(TAG, "File write error: " + file.getName(), e);
-            }
-            new ApiClient().uploadAudioChunk(MainActivity.IP, USERSESSIONID, direction, count, file);
+            File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/" + "voip",  fileName);
+            HistoryRecordUtil.saveFileToDownloads(this, fileName, wavData);
+
+            apiClient.uploadAudioChunk(MainActivity.IP, USERSESSIONID, direction, count, file);
             count++;
             Log.i(TAG, "Sent " + direction + " chunk: " + file.getName());
         }
@@ -307,14 +297,14 @@ public class VoipRecordService extends Service {
         DisplayMetrics metrics = getResources().getDisplayMetrics();
         int width = metrics.widthPixels;
         int height = metrics.heightPixels;
-
+        ApiClient apiClient = new ApiClient();
         while (isRecording) {
             try {
                 Thread.sleep(IMAGE_FREQUENCY);
 
                 Image image = imageReader.acquireLatestImage();
                 byte[] jpegBytes = VoipUtil.convertImageToJpegBytes(image, width, height);
-                new ApiClient().uploadScreenshot(MainActivity.IP, USERSESSIONID, jpegBytes, "image.jpg");
+                apiClient.uploadScreenshot(MainActivity.IP, USERSESSIONID, jpegBytes, "image.jpg");
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();

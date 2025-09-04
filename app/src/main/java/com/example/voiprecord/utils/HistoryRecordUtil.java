@@ -13,13 +13,15 @@ import java.io.FileFilter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import android.os.Environment;
-import android.util.Log;
 
-import java.io.File;
-import java.io.FileFilter;
-import java.util.ArrayList;
-import java.util.List;
+import android.content.ContentResolver;
+import android.content.ContentValues;
+import android.content.Context;
+import android.net.Uri;
+import android.os.Build;
+import android.provider.MediaStore;
+import java.io.OutputStream;
+import java.io.IOException;
 import java.util.stream.Collectors;
 
 public class HistoryRecordUtil {
@@ -90,7 +92,7 @@ public class HistoryRecordUtil {
         List<FileRecordHistory> records = new ArrayList<>();
 
         // 1. 获取外部存储的Download目录
-        File directory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        File directory = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS + "/voip");
 
         // 检查目录是否存在且可读
         if (!directory.exists() || !directory.isDirectory()) {
@@ -153,5 +155,57 @@ public class HistoryRecordUtil {
 
         Log.d(TAG, "Found and parsed " + records.size() + " file records.");
         return records;
+    }
+
+    public static void saveFileToDownloads(Context context, String fileName, byte[] fileData) {
+        ContentResolver resolver = context.getContentResolver();
+        ContentValues contentValues = new ContentValues();
+
+        // 1. 设置文件基本信息
+        contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, fileName); // 文件名，例如 "my_recording.mp3"
+        // contentValues.put(MediaStore.MediaColumns.MIME_TYPE, "audio/mpeg"); // 可选：设置文件的 MIME 类型
+
+        // 2. 设置文件的相对路径 (这是关键！)
+        // 这会在 Downloads 目录下创建一个 voip 子目录来存放文件
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/" + "voip");
+        }
+
+        Uri collectionUri;
+        // 根据系统版本选择正确的集合 URI
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            collectionUri = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY);
+        } else {
+            // 对于 Android 9 及以下版本，你需要回退到旧的方式，并且需要 WRITE_EXTERNAL_STORAGE 权限
+            // 注意：这里的路径逻辑需要单独处理，因为 RELATIVE_PATH 不可用
+            File downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            File voipDir = new File(downloadDir, "voip");
+            if (!voipDir.exists()) {
+                voipDir.mkdirs();
+            }
+            File file = new File(voipDir, fileName);
+            // 对于旧版本，我们仍然使用 ContentValues，但 URI 是从文件路径生成的
+            // 这部分逻辑较为复杂，通常建议对新旧系统采用不同方案
+            // 为了简化，这里我们仅展示新系统的方法，因为它是未来的标准
+            // 如果需要兼容旧系统，请使用 FileProvider 或传统 File IO + 权限检查
+            // 这里只保留了新系统的核心逻辑：
+            collectionUri = MediaStore.Files.getContentUri("external");
+        }
+
+        // 3. 插入一个新的文件条目，并获取其 Uri
+        Uri fileUri = resolver.insert(collectionUri, contentValues);
+
+        // 4. 通过 Uri 打开输出流，并写入文件数据
+        if (fileUri != null) {
+            try (OutputStream outputStream = resolver.openOutputStream(fileUri)) {
+                if (outputStream != null) {
+                    outputStream.write(fileData);
+                    // 文件写入成功！
+                }
+            } catch (IOException e) {
+                // 处理 IO 异常
+                e.printStackTrace();
+            }
+        }
     }
 }

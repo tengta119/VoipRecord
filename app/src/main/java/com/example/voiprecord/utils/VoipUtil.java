@@ -17,31 +17,6 @@ import android.net.NetworkCapabilities;
 import android.os.Build;
 public class VoipUtil {
 
-    public static byte[] createWavHeader(long pcmDataSize) throws IOException {
-        long totalDataLen = pcmDataSize + 36;
-        int channels = 1; // Based on CHANNEL_IN_MONO
-        long byteRate = VoipRecordService.SAMPLE_RATE * channels * (16 / 8); // 16 is for ENCODING_PCM_16BIT
-
-        ByteBuffer header = ByteBuffer.allocate(44);
-        header.order(ByteOrder.LITTLE_ENDIAN);
-
-        // RIFF/WAVE header
-        header.put("RIFF".getBytes(StandardCharsets.US_ASCII));
-        header.putInt((int) totalDataLen);
-        header.put("WAVE".getBytes(StandardCharsets.US_ASCII));
-        header.put("fmt ".getBytes(StandardCharsets.US_ASCII));
-        header.putInt(16); // 16 for PCM
-        header.putShort((short) 1); // Audio format 1=PCM
-        header.putShort((short) channels);
-        header.putInt(VoipRecordService.SAMPLE_RATE);
-        header.putInt((int) byteRate);
-        header.putShort((short) (channels * (16 / 8))); // Block align
-        header.putShort((short) 16); // Bits per sample
-        header.put("data".getBytes(StandardCharsets.US_ASCII));
-        header.putInt((int) pcmDataSize);
-
-        return header.array();
-    }
 
     /**
      * 将 ImageReader 获取的 Image 对象转换为 JPEG 格式的字节数组。
@@ -143,6 +118,37 @@ public class VoipUtil {
             // 检查网络类型是否为 Wi-Fi
             return networkInfo.getType() == ConnectivityManager.TYPE_WIFI;
         }
+    }
+
+    public static byte[] pcmToWav(long pcmDataSize, byte[] pcmData) {
+        long totalDataLen = pcmDataSize + 36;
+        int channels = 1; // Based on CHANNEL_IN_MONO
+        long byteRate = VoipRecordService.SAMPLE_RATE * channels * (16 / 8); // 16 is for ENCODING_PCM_16BIT
+
+        ByteBuffer header = ByteBuffer.allocate(44);
+        header.order(ByteOrder.LITTLE_ENDIAN);
+
+        // RIFF/WAVE header
+        header.put("RIFF".getBytes(StandardCharsets.US_ASCII));
+        header.putInt((int) totalDataLen);
+        header.put("WAVE".getBytes(StandardCharsets.US_ASCII));
+        header.put("fmt ".getBytes(StandardCharsets.US_ASCII));
+        header.putInt(16); // 16 for PCM
+        header.putShort((short) 1); // Audio format 1=PCM
+        header.putShort((short) channels);
+        header.putInt(VoipRecordService.SAMPLE_RATE);
+        header.putInt((int) byteRate);
+        header.putShort((short) (channels * (16 / 8))); // Block align
+        header.putShort((short) 16); // Bits per sample
+        header.put("data".getBytes(StandardCharsets.US_ASCII));
+        header.putInt((int) pcmDataSize);
+        byte[] wavHead = header.array();
+
+        byte[] wavData = new byte[wavHead.length + pcmData.length];
+        System.arraycopy(wavHead, 0, wavData, 0, wavHead.length);
+        System.arraycopy(pcmData, 0, wavData, wavHead.length, pcmData.length);
+
+        return wavData;
     }
 
 }
