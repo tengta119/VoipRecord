@@ -271,7 +271,7 @@ public class FloatingControlService extends Service {
                 recordingAnimationView.setVisibility(View.GONE); // <--- 隐藏动画视图
                 break;
             case RECORDING:
-                statusText.setText("录音中");
+                statusText.setText("服务中");
                 recordingAnimationView.setVisibility(View.VISIBLE); // <--- 显示动画视图
                 recordingAnimation.start(); // <--- 开始动画
                 break;
