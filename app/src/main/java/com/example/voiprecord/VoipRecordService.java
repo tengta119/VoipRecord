@@ -352,21 +352,17 @@ public class VoipRecordService extends Service {
             playbackRecord = null;
         }
 
-        new Thread(() -> {
-            CloseSessionVO closeSessionVO = new ApiClient().closeCallSessionSync(MainActivity.IP, USERSESSIONID);
-            if (closeSessionVO != null) {
-                Log.i(TAG, "CloseSessionVO: " + closeSessionVO);
-            }
-        }).start();
+        closeConnect();
 
         Log.i(TAG, "Recording stopped successfully.");
         LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(LocalBroadcastRecord.ACTION_RECORDING_STOPPED));
     }
 
     public void recordHealth() {
+        ApiClient apiClient = new ApiClient();
         Thread recordHealth = new Thread(() -> {
             while (isRecording) {
-                new ApiClient().postHealthStatusSync(MainActivity.IP, USERSESSIONID, username);
+                apiClient.postHealthStatusSync(MainActivity.IP, USERSESSIONID, username);
 
                 int waitTime = new Random().nextInt(60);
                 try {
@@ -378,6 +374,16 @@ public class VoipRecordService extends Service {
             }
         });
         recordHealth.start();
+    }
+
+    public void closeConnect() {
+        new Thread(() -> {
+            ApiClient apiClient = new ApiClient();
+            CloseSessionVO closeSessionVO = apiClient.closeCallSessionSync(MainActivity.IP, USERSESSIONID);
+            if (closeSessionVO != null) {
+                Log.i(TAG, "CloseSessionVO: " + closeSessionVO);
+            }
+        }).start();
     }
 
     @Override
