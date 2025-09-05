@@ -8,8 +8,8 @@
 
     <domain-config cleartextTrafficPermitted="true">
 <!--        公网-->
-        <domain includeSubdomains="false">audio.api.nycjy.cn</domain>
+        <domain includeSubdomains="true">1.13.14.4</domain>
 <!--      内网  -->
-        <domain includeSubdomains="false">192.168.3.112:6000</domain>
+        <domain includeSubdomains="true">192.168.3.112</domain>
     </domain-config>
 </network-security-config>

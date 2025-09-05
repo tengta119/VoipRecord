@@ -83,42 +83,42 @@ public class VoipUtil {
         }
     }
 
-    /**
-     * 检查设备当前是否连接到 Wi-Fi 网络。
-     * @param context Context
-     * @return 如果连接到 Wi-Fi 则返回 true，否则返回 false。
-     */
-    public static boolean isWifiConnected(Context context) {
-        // 获取系统连接管理器
-        ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
-        if (connectivityManager == null) {
-            return false;
-        }
-
-        // 对于 Android 10 (API 29) 及以上版本
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // 获取当前活跃网络的网络能力
-            Network activeNetwork = connectivityManager.getActiveNetwork();
-            if (activeNetwork == null) {
-                return false;
-            }
-            NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(activeNetwork);
-            if (capabilities == null) {
-                return false;
-            }
-            // 检查网络传输类型是否为 Wi-Fi
-            return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
-        }
-        // 对于旧版本
-        else {
-            android.net.NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
-            if (networkInfo == null || !networkInfo.isConnected()) {
-                return false;
-            }
-            // 检查网络类型是否为 Wi-Fi
-            return networkInfo.getType() == ConnectivityManager.TYPE_WIFI;
-        }
-    }
+    ///**
+    // * 检查设备当前是否连接到 Wi-Fi 网络。
+    // * @param context Context
+    // * @return 如果连接到 Wi-Fi 则返回 true，否则返回 false。
+    // */
+    //public static boolean isWifiConnected(Context context) {
+    //    // 获取系统连接管理器
+    //    ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+    //    if (connectivityManager == null) {
+    //        return false;
+    //    }
+    //
+    //    // 对于 Android 10 (API 29) 及以上版本
+    //    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+    //        // 获取当前活跃网络的网络能力
+    //        Network activeNetwork = connectivityManager.getActiveNetwork();
+    //        if (activeNetwork == null) {
+    //            return false;
+    //        }
+    //        NetworkCapabilities capabilities = connectivityManager.getNetworkCapabilities(activeNetwork);
+    //        if (capabilities == null) {
+    //            return false;
+    //        }
+    //        // 检查网络传输类型是否为 Wi-Fi
+    //        return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI);
+    //    }
+    //    // 对于旧版本
+    //    else {
+    //        android.net.NetworkInfo networkInfo = connectivityManager.getActiveNetworkInfo();
+    //        if (networkInfo == null || !networkInfo.isConnected()) {
+    //            return false;
+    //        }
+    //        // 检查网络类型是否为 Wi-Fi
+    //        return networkInfo.getType() == ConnectivityManager.TYPE_WIFI;
+    //    }
+    //}
 
     public static byte[] pcmToWav(long pcmDataSize, byte[] pcmData) {
         long totalDataLen = pcmDataSize + 36;

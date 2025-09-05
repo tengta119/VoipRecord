@@ -172,7 +172,7 @@ public class VoipRecordService extends Service {
 
     private void startRecording() {
 
-        if (!VoipUtil.isWifiConnected(this) || createConnect() == null) {
+        if (createConnect() == null) {
             LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(LocalBroadcastRecord.ACTION_RECORDING_FAIL));
             Log.e(TAG, "网络异常");
             return;
@@ -245,6 +245,7 @@ public class VoipRecordService extends Service {
         if (connect == null) {
             Log.e(TAG, "开始尝试外网" + MainActivity.EXTRANETIP);
             currentIp = MainActivity.EXTRANETIP;
+            Log.e(TAG, "外网连接成功");
             connect = connect();
         }
         return connect;

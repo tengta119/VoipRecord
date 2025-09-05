@@ -58,8 +58,8 @@ public class MainActivity extends AppCompatActivity {
         FAIL,       // 失败
     }
     private RecordingState currentState = RecordingState.IDLE;
-    public static String INTRANETIP = "192.168.3.112:6000";
-    public static String EXTRANETIP = "http://audio.api.nycjy.cn";
+    public static String INTRANETIP = "http://192.168.3.112:6000";
+    public static String EXTRANETIP = "http://1.13.14.4:18001";
     private class ModeChangeListener implements AudioManager.OnModeChangedListener {
         @Override
         public void onModeChanged(int mode) {
