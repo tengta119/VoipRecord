@@ -37,6 +37,11 @@ public class ApiClient {
      */
     public UserSessionVO createNewCallSession(String baseUrl, String username) {
 
+        OkHttpClient createClient = new OkHttpClient.Builder()
+                .connectTimeout(10, TimeUnit.SECONDS) // 连接超时
+                .readTimeout(10, TimeUnit.SECONDS)    // 读取超时
+                .writeTimeout(10, TimeUnit.SECONDS)   // 写入超时
+                .build();
 
         // 2. 使用 FormBody.Builder 构建请求体
         // 这会自动处理 URL 编码和设置 Content-Type 为 application/x-www-form-urlencoded
@@ -52,7 +57,7 @@ public class ApiClient {
                 .build();
 
         UserSessionVO userSessionVO = null;
-        try (Response response = client.newCall(request).execute()) {
+        try (Response response = createClient.newCall(request).execute()) {
 
             String jsonStr = "";
             if (response.body() != null) {
@@ -63,7 +68,8 @@ public class ApiClient {
             userSessionVO = gson.fromJson(jsonStr, UserSessionVO.class);
             Log.d(TAG, "userSession:" + userSessionVO.toString());
         } catch (Exception e) {
-            Log.e(TAG, "创建新会话失败: " + e.getMessage());
+            Log.e(TAG, "创建会话失败: " + e.getMessage());
+            return null;
         }
         return userSessionVO;
     }

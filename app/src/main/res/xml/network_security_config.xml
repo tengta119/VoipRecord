@@ -7,6 +7,9 @@
     </base-config>
 
     <domain-config cleartextTrafficPermitted="true">
+<!--        公网-->
         <domain includeSubdomains="false">audio.api.nycjy.cn</domain>
+<!--      内网  -->
+        <domain includeSubdomains="false">192.168.3.112:6000</domain>
     </domain-config>
 </network-security-config>

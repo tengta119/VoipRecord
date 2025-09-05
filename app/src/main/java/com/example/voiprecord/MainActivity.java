@@ -58,7 +58,8 @@ public class MainActivity extends AppCompatActivity {
         FAIL,       // 失败
     }
     private RecordingState currentState = RecordingState.IDLE;
-    public static String IP = "http://audio.api.nycjy.cn";
+    public static String INTRANETIP = "192.168.3.112:6000";
+    public static String EXTRANETIP = "http://audio.api.nycjy.cn";
     private class ModeChangeListener implements AudioManager.OnModeChangedListener {
         @Override
         public void onModeChanged(int mode) {
@@ -289,7 +290,7 @@ public class MainActivity extends AppCompatActivity {
                 recordButton.setEnabled(true);
                 recordButton.setBackgroundResource(R.drawable.bg_record_idle);
                 recordButton.setImageResource(R.drawable.ic_mic);
-                statusText.setText("Wifi 连接失败，请重试");
+                statusText.setText("网络异常");
                 break;
             case STARTING:
             case STOPPING:

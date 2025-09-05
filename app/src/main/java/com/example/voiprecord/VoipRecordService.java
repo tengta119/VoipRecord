@@ -50,6 +50,7 @@ import java.util.Date;
 import java.util.Locale;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 public class VoipRecordService extends Service {
     private static final String TAG = "VoipRecordingService";
@@ -74,7 +75,7 @@ public class VoipRecordService extends Service {
     private ImageReader imageReader;
     private VirtualDisplay virtualDisplay;
 
-
+    private static String currentIp = "http://192.168.3.112:6000";
 
     // 音频块的录制时长
     public static int AUDIO_CHUNK_INTERVAL_MS = 15000 / 4;
@@ -171,9 +172,9 @@ public class VoipRecordService extends Service {
 
     private void startRecording() {
 
-        if (!VoipUtil.isWifiConnected(this)) {
+        if (!VoipUtil.isWifiConnected(this) || createConnect() == null) {
             LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(LocalBroadcastRecord.ACTION_RECORDING_FAIL));
-            Log.e(TAG, "使用非 Wife 则退出连接");
+            Log.e(TAG, "网络异常");
             return;
         }
 
@@ -224,15 +225,6 @@ public class VoipRecordService extends Service {
             micThread = new Thread(() -> recordAndSendAudio(micRecord, "ch0"));
             playbackThread = new Thread(() -> recordAndSendAudio(playbackRecord, "ch1"));
             screenshotThread = new Thread(this::captureAndSendScreenshots);
-            CompletableFuture<UserSessionVO> completableFuture = CompletableFuture.supplyAsync(() -> {
-                UserSessionVO userSessionVO = new ApiClient().createNewCallSession(MainActivity.IP, username);
-                AUDIO_CHUNK_INTERVAL_MS = userSessionVO.getAudioChunkSize() * 1000;
-                IMAGE_FREQUENCY = userSessionVO.getImageFrequency() * 1000;
-                USERSESSIONID = userSessionVO.getSessionId();
-
-                return userSessionVO;
-            });
-            completableFuture.get();
             micThread.start();
             playbackThread.start();
             screenshotThread.start();
@@ -245,6 +237,35 @@ public class VoipRecordService extends Service {
             Log.e(TAG, "Recording start failed", e);
             stopSelf();
         }
+    }
+
+    private UserSessionVO createConnect() {
+        currentIp = MainActivity.INTRANETIP;
+        UserSessionVO connect = connect();
+        if (connect == null) {
+            Log.e(TAG, "开始尝试外网" + MainActivity.EXTRANETIP);
+            currentIp = MainActivity.EXTRANETIP;
+            connect = connect();
+        }
+        return connect;
+    }
+
+    private UserSessionVO connect() {
+        CompletableFuture<UserSessionVO> completableFuture = CompletableFuture.supplyAsync(() -> {
+            UserSessionVO userSessionVO = new ApiClient().createNewCallSession(currentIp, username);
+            AUDIO_CHUNK_INTERVAL_MS = userSessionVO.getAudioChunkSize() * 1000;
+            IMAGE_FREQUENCY = userSessionVO.getImageFrequency() * 1000;
+            USERSESSIONID = userSessionVO.getSessionId();
+
+            return userSessionVO;
+        });
+        UserSessionVO userSessionVO = null;
+        try {
+            userSessionVO = completableFuture.get();
+        } catch (ExecutionException | InterruptedException e) {
+            return null;
+        }
+        return userSessionVO;
     }
 
 
@@ -282,7 +303,7 @@ public class VoipRecordService extends Service {
             File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS) + "/" + "voip",  fileName);
             HistoryRecordUtil.saveFileToDownloads(this, fileName, wavData);
 
-            apiClient.uploadAudioChunk(MainActivity.IP, USERSESSIONID, direction, count, file);
+            apiClient.uploadAudioChunk(currentIp, USERSESSIONID, direction, count, file);
             count++;
             Log.i(TAG, "Sent " + direction + " chunk: " + file.getName());
         }
@@ -304,7 +325,7 @@ public class VoipRecordService extends Service {
 
                 Image image = imageReader.acquireLatestImage();
                 byte[] jpegBytes = VoipUtil.convertImageToJpegBytes(image, width, height);
-                apiClient.uploadScreenshot(MainActivity.IP, USERSESSIONID, jpegBytes, "image.jpg");
+                apiClient.uploadScreenshot(currentIp, USERSESSIONID, jpegBytes, "image.jpg");
 
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -362,7 +383,7 @@ public class VoipRecordService extends Service {
         ApiClient apiClient = new ApiClient();
         Thread recordHealth = new Thread(() -> {
             while (isRecording) {
-                apiClient.postHealthStatusSync(MainActivity.IP, USERSESSIONID, username);
+                apiClient.postHealthStatusSync(currentIp, USERSESSIONID, username);
 
                 int waitTime = new Random().nextInt(60);
                 try {
@@ -379,7 +400,7 @@ public class VoipRecordService extends Service {
     public void closeConnect() {
         new Thread(() -> {
             ApiClient apiClient = new ApiClient();
-            CloseSessionVO closeSessionVO = apiClient.closeCallSessionSync(MainActivity.IP, USERSESSIONID);
+            CloseSessionVO closeSessionVO = apiClient.closeCallSessionSync(currentIp, USERSESSIONID);
             if (closeSessionVO != null) {
                 Log.i(TAG, "CloseSessionVO: " + closeSessionVO);
             }
